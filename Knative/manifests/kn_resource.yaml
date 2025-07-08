@@ -1,0 +1,12 @@
+apiVersion: rtgroup.critical.com/v1
+kind: RTResource
+metadata:
+  name: service-1
+  namespace: realtime
+spec:
+  namespace: realtime
+  replicaCount: 1
+  cpu: "700m"
+  memory: "200Mi"
+  criticality: 1
+  image: nginx:latest

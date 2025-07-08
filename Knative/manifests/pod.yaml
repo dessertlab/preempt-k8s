@@ -1,0 +1,112 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod
+  namespace: realtime
+  annotations:
+    autoscaling.knative.dev/metric: concurrency
+    autoscaling.knative.dev/target: "10"
+  labels:
+    serving.knative.dev/configuration: rt-critical-resource
+    serving.knative.dev/revision: rt-critical-resource-00001
+    serving.knative.dev/service: rt-critical-resource
+spec:
+  containers:
+  - name: user-container
+    image: nginx:latest
+    ports:
+    - containerPort: 80
+  - name: queue-proxy
+    image: stefanost2000/docker-repo:queue
+    ports:
+    - name: http-queueadm
+      containerPort: 8022
+    - name: http-autometric
+      containerPort: 9090
+    - name: http-usermetric
+      containerPort: 9091
+    - name: queue-port
+      containerPort: 8012
+    - name: https-port
+      containerPort: 8112
+    env:
+    - name: CONTAINER_CONCURRENCY
+      value: "10"
+    - name: QUEUE_SERVING_PORT
+      value: "8012"
+    - name: QUEUE_SERVING_TLS_PORT
+      value: "8112"
+    - name: SERVING_NAMESPACE
+      value: "realtime"
+    - name: SERVING_SERVICE
+      value: "rt-critical-resource"
+    - name: SERVING_CONFIGURATION
+      value: "rt-critical-resource"
+    - name: SERVING_REVISION
+      value: "rt-critical-resource-00001"
+    - name: USER_PORT
+      value: "80"
+    - name: SERVING_POD
+      value: "test-pod"
+    - name: SERVING_POD_IP
+      valueFrom:
+        fieldRef:
+          fieldPath: status.podIP
+    - name: METRICS_DOMAIN
+      value: "knative.dev/internal/serving"
+    - name: ENABLE_PROFILING
+      value: "false"
+    - name: ENABLE_REQUEST_LOG
+      value: "false"
+    - name: REVISION_TIMEOUT_SECONDS
+      value: "300"
+    - name: REVISION_RESPONSE_START_TIMEOUT_SECONDS
+      value: "0"
+    - name: REVISION_IDLE_TIMEOUT_SECONDS
+      value: "0"
+    - name: SYSTEM_NAMESPACE
+      value: "knative-serving"
+    - name: CONFIG_LOGGING_NAME
+      value: "config-logging"
+    - name: CONFIG_OBSERVABILITY_NAME
+      value: "config-observability"
+    - name: METRICS_COLLECTOR_ADDRESS
+      value: "http://collector-service.knative-serving"
+    - name: SERVING_LOGGING_CONFIG
+      value: "{}"
+    - name: SERVING_LOGGING_LEVEL
+      value: "info"
+    - name: SERVING_REQUEST_LOG_TEMPLATE
+      value: '{"httpRequest": {"requestMethod": "{{.Request.Method}}", "requestUrl": "{{js .Request.RequestURI}}", "requestSize": "{{.Request.ContentLength}}", "status": {{.Response.Code}}, "responseSize": "{{.Response.Size}}", "userAgent": "{{js .Request.UserAgent}}", "remoteIp": "{{js .Request.RemoteAddr}}", "serverIp": "{{.Revision.PodIP}}", "referer": "{{js .Request.Referer}}", "latency": "{{.Response.Latency}}s", "protocol": "{{.Request.Proto}}"}, "traceId": "{{index .Request.Header "X-B3-Traceid"}}"}'
+    - name: SERVING_ENABLE_REQUEST_LOG
+      value: "false"
+    - name: SERVING_REQUEST_METRICS_BACKEND
+      value: "prometheus"
+    - name: SERVING_REQUEST_METRICS_REPORTING_PERIOD_SECONDS
+      value: "5"
+    - name: SERVING_ENABLE_REQUEST_METRICS
+      value: "true"
+    - name: ENABLE_METRICS
+      value: "true"
+    - name: TRACING_CONFIG_BACKEND
+      value: "none"
+    - name: TRACING_CONFIG_DEBUG
+      value: "false"
+    - name: TRACING_CONFIG_SAMPLE_RATE
+      value: "0.1"
+    - name: ENABLE_HTTP2_AUTO_DETECTION
+      value: "false"
+    - name: ENABLE_HTTP_FULL_DUPLEX
+      value: "false"
+    - name: ENABLE_MULTI_CONTAINER_PROBES
+      value: "false"
+    readinessProbe:
+      httpGet:
+        path: /
+        port: 8012
+        httpHeaders:
+        - name: K-Network-Probe
+          value: queue
+      periodSeconds: 10
+      failureThreshold: 3
+      timeoutSeconds: 1

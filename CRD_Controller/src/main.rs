@@ -2,9 +2,9 @@ extern crate libc;
 
 use kube::{Client, Api, CustomResource, ResourceExt, runtime::{watcher, watcher::{Config, Event}}, api::{PostParams, ListParams, DeleteParams}};
 use serde::{Deserialize, Serialize};
-use k8s_openapi::{api::core::v1::{Pod, PodSpec, Container, ResourceRequirements}, apimachinery::pkg::api::resource::Quantity};
+use k8s_openapi::{api::core::v1::{Pod, PodSpec, Container, ContainerPort, ResourceRequirements, EnvVar, EnvVarSource, ObjectFieldSelector, Probe, HTTPGetAction, HTTPHeader}, apimachinery::pkg::{api::resource::Quantity, util::intstr::IntOrString}};
 use libc::*;
-use std::{thread, mem, ptr, sync::Arc, error::Error, ffi::{c_void, CString}, collections::BTreeMap, time::{SystemTime, UNIX_EPOCH, Duration}};
+use std::{mem, ptr, sync::Arc, error::Error, ffi::{c_void, CString}, collections::BTreeMap, time::{SystemTime, UNIX_EPOCH}};
 use anyhow::Result;
 use schemars::JsonSchema;
 use futures::stream::StreamExt;
@@ -108,12 +108,10 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         if result != 0 {
             eprintln!("An error occurred while creating the CRD Watcher thread! {}", result);
         }
-        //set_thread_affinity(crd_watcher_thread, 0);
         result = pthread_create(&mut pod_watcher_thread, &attr as *const _ as *const pthread_attr_t, pod_watcher, &datas as *const _ as *mut c_void);
         if result != 0 {
             eprintln!("An error occurred while creating the Pod Event Watcher thread!");
         }
-        //set_thread_affinity(pod_watcher_thread, 0);
 
         //We then create the thread that will take care of serving Events on the queue creating a correct amount of threads that will actually handle an Event
         param.sched_priority = 95;
@@ -122,7 +120,6 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         if result != 0 {
             eprintln!("An error occurred while creating the Server thread! {}", result);
         }
-        //set_thread_affinity(server_thread, 0);
 
         //Waits for the conclusion of created threads
         pthread_join(crd_watcher_thread, ptr::null_mut());
@@ -168,7 +165,7 @@ extern "C" fn crd_watcher(thread_data: *mut c_void) -> *mut c_void {
 			match event{
 				Ok(Event::Applied(object)) | Ok(Event::Deleted(object)) => {
 					let msg = object.name_any();
-					let mut result;
+					let result;
 					let mut c_msg = msg.clone().into_bytes();
 					c_msg.push(0);
 					result = mq_send(queue_des, c_msg.as_ptr() as *const i8, c_msg.len(), object.spec.criticality);
@@ -228,7 +225,7 @@ extern "C" fn pod_watcher(thread_data: *mut c_void) -> *mut c_void {
 					let labels = object.metadata.labels.unwrap();
 					let msg = labels.get("crd_id").unwrap();
 					let criticality_str = labels.get("criticality").unwrap();
-					let mut result;
+					let result;
 					let msg_copy = msg.clone(); 
 					let mut c_msg = msg_copy.into_bytes();
 					let criticality = criticality_str.parse::<u32>().unwrap();
@@ -294,7 +291,6 @@ extern "C" fn server(thread_data: *mut c_void) -> *mut c_void {
 		    if result != 0 {
 		        eprintln!("An error occurred while creating a Watchdog thread!");
 		    }
-		    //set_thread_affinity(active_watchdogs[i].id, 0);
 		    active_watchdogs[i].active = true;
 		    println!("State: {}", active_watchdogs[i].active);
 		}
@@ -311,7 +307,7 @@ extern "C" fn server(thread_data: *mut c_void) -> *mut c_void {
     			let difference = active_threads - working_threads as usize;
     			let currently_active = active_threads;
     			if difference < THRESHOLD {
-				let mut needed = THRESHOLD - difference;
+				let needed = THRESHOLD - difference;
 				let mut new_active = active_threads + needed;
 				if new_active > MAX_WATCHDOG_THREAD_NUMBER {
 					active_threads = MAX_WATCHDOG_THREAD_NUMBER
@@ -336,7 +332,6 @@ extern "C" fn server(thread_data: *mut c_void) -> *mut c_void {
 				    	if result != 0 {
 						eprintln!("An error occurred while creating a Watchdog thread!");
 				    	}
-				    	//set_thread_affinity(active_watchdogs[free].id, 0);
 				    	active_watchdogs[free].active = true;
 				}
 			}
@@ -536,33 +531,280 @@ async fn create_pod(client: Client, crd: &RTResourceSpec, crd_id: &str, critical
     let pod_api: Api<Pod> = Api::namespaced(client, crd.namespace.clone().as_str());
     let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards!").as_millis().to_string();
     let pod_name = format!("{}-{}", crd_id, timestamp);
+    
+    //We now create the Pod Manifest
     let pod = Pod {
-        metadata: kube::core::ObjectMeta {
-            name: Some(pod_name.clone()),
-            labels: Some({
-                let mut labels = BTreeMap::new();
-                labels.insert("crd_id".to_string(), crd_id.to_string());
-                labels.insert("criticality".to_string(), criticality.to_string());
-                labels
-            }),
-            ..Default::default()
-        },
-        spec: Some(PodSpec {
-            containers: vec![Container {
-                name: pod_name.clone(),
+    metadata: kube::core::ObjectMeta {
+        name: Some(pod_name.clone()),
+        namespace: Some(crd.namespace.clone().to_string()),
+        labels: Some({
+            let mut labels = BTreeMap::new();
+            labels.insert("crd_id".to_string(), crd_id.to_string());
+            labels.insert("criticality".to_string(), criticality.to_string());
+            labels.insert("serving.knative.dev/configuration".to_string(), crd_id.to_string());
+            labels.insert("serving.knative.dev/revision".to_string(), format!("{}-00001", crd_id));
+            labels.insert("serving.knative.dev/service".to_string(), crd_id.to_string());
+            labels
+        }),
+        annotations: Some({
+            let mut annotations = BTreeMap::new();
+            annotations.insert("config.dyn.running-services/allow-http-full-duplex".to_string(), "Enabled".to_string());
+            annotations
+        }),
+        ..Default::default()
+    },
+    spec: Some(PodSpec {
+        containers: vec![
+            Container {
+                name: "server".to_string(),
                 image: Some(crd.image.clone()),
+                ports: Some(vec![
+                    ContainerPort {
+                        container_port: 8080,
+                        ..Default::default()
+                    }
+                ]),
                 resources: Some(ResourceRequirements {
-                    requests: Some({
-                        let mut requests = BTreeMap::new();
-                        requests.insert("cpu".to_string(), Quantity(crd.cpu.clone()));
-                        requests.insert("memory".to_string(), Quantity(crd.memory.clone()));
-                        requests
-                    }),
-                    claims: None,
-                    limits: None,
-                }),
+		    requests: Some({
+		        let mut requests = BTreeMap::new();
+		        requests.insert("cpu".to_string(), Quantity(crd.cpu.clone()));
+		        requests.insert("memory".to_string(), Quantity(crd.memory.clone()));
+		        requests
+		    }),
+		    claims: None,
+		    limits: None,
+		}),
                 ..Default::default()
-            }],
+            },
+            Container {
+		    name: "queue-proxy".to_string(),
+		    image: Some("stefanost2000/docker-repo:queue".to_string()),
+		    image_pull_policy: Some("Always".to_string()),
+		    ports: Some(vec![
+			ContainerPort {
+			    name: Some("http-queueadm".to_string()),
+			    container_port: 8022,
+			    ..Default::default()
+			},
+			ContainerPort {
+			    name: Some("http-autometric".to_string()),
+			    container_port: 9090,
+			    ..Default::default()
+			},
+			ContainerPort {
+			    name: Some("http-usermetric".to_string()),
+			    container_port: 9091,
+			    ..Default::default()
+			},
+			ContainerPort {
+			    name: Some("queue-port".to_string()),
+			    container_port: 8012,
+			    ..Default::default()
+			},
+			ContainerPort {
+			    name: Some("https-port".to_string()),
+			    container_port: 8112,
+			    ..Default::default()
+			}
+		    ]),
+		    env: Some(vec![
+			EnvVar {
+			    name: "CONTAINER_CONCURRENCY".to_string(),
+			    value: Some("10".to_string()),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "QUEUE_SERVING_PORT".to_string(),
+			    value: Some("8012".to_string()),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "QUEUE_SERVING_TLS_PORT".to_string(),
+			    value: Some("8112".to_string()),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "SERVING_NAMESPACE".to_string(),
+			    value: Some(crd.namespace.clone().to_string()),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "SERVING_SERVICE".to_string(),
+			    value: Some(crd_id.to_string()),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "SERVING_CONFIGURATION".to_string(),
+			    value: Some(crd_id.to_string()),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "SERVING_REVISION".to_string(),
+			    value: Some(format!("{}-00001", crd_id)),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "USER_PORT".to_string(),
+			    value: Some("8080".to_string()),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "SERVING_POD".to_string(),
+			    value: Some(pod_name.clone()),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "SERVING_POD_IP".to_string(),
+			    value_from: Some(EnvVarSource {
+				field_ref: Some(ObjectFieldSelector {
+				    field_path: "status.podIP".to_string(),
+				    ..Default::default()
+				}),
+				..Default::default()
+			    }),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "METRICS_DOMAIN".to_string(),
+			    value: Some("knative.dev/internal/serving".to_string()),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "ENABLE_PROFILING".to_string(),
+			    value: Some("false".to_string()),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "ENABLE_REQUEST_LOG".to_string(),
+			    value: Some("false".to_string()),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "REVISION_TIMEOUT_SECONDS".to_string(),
+			    value: Some("300".to_string()),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "REVISION_RESPONSE_START_TIMEOUT_SECONDS".to_string(),
+			    value: Some("0".to_string()),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "REVISION_IDLE_TIMEOUT_SECONDS".to_string(),
+			    value: Some("0".to_string()),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "SYSTEM_NAMESPACE".to_string(),
+			    value: Some("knative-serving".to_string()),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "CONFIG_LOGGING_NAME".to_string(),
+			    value: Some("config-logging".to_string()),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "CONFIG_OBSERVABILITY_NAME".to_string(),
+			    value: Some("config-observability".to_string()),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "METRICS_COLLECTOR_ADDRESS".to_string(),
+			    value: Some("http://collector-service.knative-serving".to_string()),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "SERVING_LOGGING_CONFIG".to_string(),
+			    value: Some("{}".to_string()),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "SERVING_LOGGING_LEVEL".to_string(),
+			    value: Some("info".to_string()),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "SERVING_REQUEST_LOG_TEMPLATE".to_string(),
+			    value: Some("{\"httpRequest\": {\"requestMethod\": \"{{.Request.Method}}\", \"requestUrl\": \"{{js .Request.RequestURI}}\", \"requestSize\": \"{{.Request.ContentLength}}\", \"status\": {{.Response.Code}}, \"responseSize\": \"{{.Response.Size}}\", \"userAgent\": \"{{js .Request.UserAgent}}\", \"remoteIp\": \"{{js .Request.RemoteAddr}}\", \"serverIp\": \"{{.Revision.PodIP}}\", \"referer\": \"{{js .Request.Referer}}\", \"latency\": \"{{.Response.Latency}}s\", \"protocol\": \"{{.Request.Proto}}\"}, \"traceId\": \"{{index .Request.Header \\\"X-B3-Traceid\\\"}}\"}"
+				.to_string()),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "SERVING_ENABLE_REQUEST_LOG".to_string(),
+			    value: Some("false".to_string()),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "SERVING_REQUEST_METRICS_BACKEND".to_string(),
+			    value: Some("prometheus".to_string()),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "SERVING_REQUEST_METRICS_REPORTING_PERIOD_SECONDS".to_string(),
+			    value: Some("5".to_string()),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "SERVING_ENABLE_REQUEST_METRICS".to_string(),
+			    value: Some("true".to_string()),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "ENABLE_METRICS".to_string(),
+			    value: Some("true".to_string()),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "TRACING_CONFIG_BACKEND".to_string(),
+			    value: Some("none".to_string()),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "TRACING_CONFIG_DEBUG".to_string(),
+			    value: Some("false".to_string()),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "TRACING_CONFIG_SAMPLE_RATE".to_string(),
+			    value: Some("0.1".to_string()),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "ENABLE_HTTP2_AUTO_DETECTION".to_string(),
+			    value: Some("false".to_string()),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "ENABLE_HTTP_FULL_DUPLEX".to_string(),
+			    value: Some("true".to_string()),
+			    ..Default::default()
+			},
+			EnvVar {
+			    name: "ENABLE_MULTI_CONTAINER_PROBES".to_string(),
+			    value: Some("false".to_string()),
+			    ..Default::default()
+			}
+		    ]),
+		    readiness_probe: Some(Probe {
+			http_get: Some(HTTPGetAction {
+			    path: Some("/".to_string()),
+			    port: IntOrString::Int(8012),
+			    http_headers: Some(vec![
+				HTTPHeader {
+				    name: "K-Network-Probe".to_string(),
+				    value: "queue".to_string(),
+				}
+			    ]),
+			    ..Default::default()
+			}),
+			period_seconds: Some(10),
+			failure_threshold: Some(3),
+			timeout_seconds: Some(1),
+			..Default::default()
+		    }),
+		    ..Default::default()
+		}],
             ..Default::default()
         }),
         ..Default::default()
@@ -583,7 +825,7 @@ async fn create_pod(client: Client, crd: &RTResourceSpec, crd_id: &str, critical
 
 //This function deletes a Pod
 async fn delete_pod(client: Client, namespace: &str, uid: &str, name: &str) -> Result<(), Box<dyn Error>> {
-    
+
     let pod_api: Api<Pod> = Api::namespaced(client.clone(), namespace.clone());
     if let Some(pod) = pod_api.get(name).await.ok() {
         if let Some(pod_uid) = &pod.metadata.uid.clone() {
@@ -602,93 +844,28 @@ async fn delete_pod(client: Client, namespace: &str, uid: &str, name: &str) -> R
 
 //This function simulates the scheduling decision to assign a node name to a pod
 fn scheduling(mut pod: Pod) -> Pod {
-
-    //Single Node Deployment
-    /*
-    if let Some(spec) = pod.spec.as_mut() {
-        spec.node_name = Some("orionw1".to_string());
-    }
-    */
     
-    //Node orionw1 exclusive for most-critical-resource
-    let node_name = if pod.clone().metadata.name.unwrap().starts_with("most-critical-resource-") {
-        "orionw1"
-    } else {
-        let random_number = rand::thread_rng().gen_range(2..=4);
+    let node_name = if pod.clone().metadata.name.unwrap().starts_with("service-1-") {
+        let random_number = rand::thread_rng().gen_range(1..=2);
         match random_number {
+            1 => "orionw1",
             2 => "orionw2",
+            _ => "orionw1" //Default
+        }
+    } else {
+        let random_number = rand::thread_rng().gen_range(3..=4);
+        match random_number {
             3 => "orionw3",
             4 => "orionw4",
-            _ => "orionw2" //Default
+            _ => "orionw3" //Default
         }
     };
-
-    if let Some(spec) = pod.spec.as_mut() {
-        spec.node_name = Some(node_name.to_string());
-    }
-    
-    //Multiple Random Node Deployment
-    /*
-    let random_number = rand::thread_rng().gen_range(1..=4);
-    let mut node_name = "";
-    match random_number {
-        1 => node_name = "orionw1",
-        2 => node_name = "orionw2",
-        3 => node_name = "orionw3",
-        4 => node_name = "orionw4",
-        _ => node_name = "orionw1" //Default
-    }
     
     if let Some(spec) = pod.spec.as_mut() {
         spec.node_name = Some(node_name.to_string());
     }
-    */
     
     pod
-    
-}
-
-//The following function is used to schedule Threads on a specific CPU for testing purposes
-unsafe fn set_thread_affinity(thread: pthread_t, cpu_id: usize) -> bool {
-
-    //We set the affinity
-    let mut cpuset: cpu_set_t = std::mem::zeroed();
-    CPU_ZERO(&mut cpuset);
-    CPU_SET(cpu_id, &mut cpuset);
-    
-    let result = pthread_setaffinity_np(
-        thread,
-        std::mem::size_of::<cpu_set_t>(),
-        &cpuset as *const cpu_set_t
-    );
-    
-    if result != 0 {
-        eprintln!("Failed to set CPU affinity: {}", result);
-        return false;
-    }
-    
-    //We verify the affinity was set correctly
-    let mut cpuset_check: cpu_set_t = std::mem::zeroed();
-    CPU_ZERO(&mut cpuset_check);
-    let check_result = pthread_getaffinity_np(
-        thread,
-        std::mem::size_of::<cpu_set_t>(),
-        &mut cpuset_check as *mut cpu_set_t
-    );
-    
-    if check_result != 0 {
-        eprintln!("Failed to get CPU affinity: {}", check_result);
-        return false;
-    }
-    
-    if !CPU_ISSET(cpu_id, &cpuset_check) {
-        eprintln!("CPU affinity verification failed for CPU {}", cpu_id);
-        return false;
-    }
-    
-    println!("Thread successfully bound to CPU {}", cpu_id);
-    
-    true
     
 }
 

@@ -17,7 +17,8 @@ The Controller and the CRD allow to replicate the Deployment and ReplicaSet Cont
 ## Repository Overview
 
 The preempt-k8s main branch contains:
-- CRD_Controller, which is the directory related to the Controller project with its manifests and the experiments.
+- CRD_Controller, which is the directory related to the Controller project with its manifests and the experiments;
+- Knative, containing all Knative proof-of-concept setup resources and docs.
 
 Check for more detailed Readme files to understand each part of the project.
 
@@ -54,28 +55,7 @@ Verify that the namespace is created, the CRD is installed and the Controller is
   kubectl get namespaces
   kubectl get pod -n realtime rt-controller
 ```
-Now use the resource already given and execute the followiong commands to verify everything is working properly.
 
-First change the the 'replicaCount' field to '1'.
-
-```bash
-  vim resource.yaml
-```
-
-Now create the resource, you should see a Pod related to that resource appear.
-
-```bash
-  kubectl apply -f resource.yaml
-  kubectl get pods -n realtime
-```
-Change the 'replicaCount' to other values and use the above commands to verify the Controller scales accordingly.
-
-After that, delete the resource and verify the Controller deletes all Pods related to that resource.
-
-```bash
-  kubectl delete -f resource.yaml
-  kubectl get pods -n realtime
-```
 Now the Controller is ready to be used.
 
 ```
