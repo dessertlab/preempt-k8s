@@ -3,7 +3,7 @@
 
 This project aims at implementing the first step towards a co-orchestrator Kubernetes architecture. We developed a Controller dedicated to a new kind of Custom Resource that brings with it the concept of criticality level.
 For the moment, this is just an additional component in the classic Kubernetes Vanilla Version.
-The Controller and the CRD allow to replicate the Deployment and ReplicaSet Control Loop and Deployments lifecycle in a Real Time fashion using Rust code allowing full control over Event handling Threads and their scheduling priority.
+The Controller and the CRD allow to replicate the Deployment and ReplicaSet Control Loop and Deployment lifecycle in a Real Time fashion using Rust code allowing full control over Event handling Threads and their scheduling priority.
 
 ## Requirements
 
@@ -17,9 +17,9 @@ The Controller and the CRD allow to replicate the Deployment and ReplicaSet Cont
 ## Repository Overview
 
 The preempt-k8s main branch contains:
-- CRD_Controller, which is the directory related to the Controller project with its manifests and the experiments.
+- CRD_Controller, which is the directory related to the Controller project with its manifests and main resources.
 
-Check for more detailed Readme files to understand each part of the project.
+Check for more detailed README files to understand each part of the project.
 
 ## Build and Installation
 
@@ -32,7 +32,7 @@ Clone this repository in the work environment and build the Controller.
   sudo docker push <path-to-your-docker-image>
 ```
 
-You now need to modify the Controller Manifest by changing the image field to your <path-to-your-docker-image>.
+You now need to modify the Controller Manifest by changing the image field to your "path-to-your-docker-image¨.
 
 ```bash
   cd <work-dir>/preempt-k8s/CRD_Controller/src/Resources/
@@ -78,7 +78,7 @@ After that, delete the resource and verify the Controller deletes all Pods relat
 ```
 Now the Controller is ready to be used.
 
-```
+
 To uninstall everything use the following commands.
 
 ```bash
