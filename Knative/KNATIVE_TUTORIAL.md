@@ -3,13 +3,13 @@
 
 This file will serve as a guide to install and use both the Knative original and patched version.
 
-Skip the build tutorial if you want to used the already patched version.
+Skip the build tutorial if you want to use the already patched version.
 
 ## Build Custom Version (in Development Environment)
 
 ```bash
   git clone https://github.com/knative/serving.git
-cd serving
+  cd serving
 ```
 
 Modify Files according to "CREATE_CUSTOM_VERSION.md" File.
