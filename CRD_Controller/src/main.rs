@@ -645,7 +645,7 @@ async fn create_pod(client: Client, crd: &RTResourceSpec, crd_id: &str, critical
 			},
 			EnvVar {
 			    name: "USER_PORT".to_string(),
-			    value: Some("8080".to_string()),
+			    value: Some("80".to_string()),
 			    ..Default::default()
 			},
 			EnvVar {
