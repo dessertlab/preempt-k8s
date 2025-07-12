@@ -204,8 +204,8 @@ The following command will create the pod and enter it.
 Generate load from inside the pod with those tools (Curl for a single request, Hey for multiple requests).
 
 ```bash
-  curl http://rt-critical-resource.realtime.svc.cluster.local
-  ./hey -c 50 -q 100 -z 60s http://rt-critical-resource.realtime.svc.cluster.local
+  curl http://service-1.realtime.svc.cluster.local
+  ./hey -c 50 -q 100 -z 60s http://service-1.realtime.svc.cluster.local
 ```
 To delete the Pod, exit from it and delete it as a normal pod.
 
