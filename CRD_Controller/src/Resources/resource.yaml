@@ -9,4 +9,4 @@ spec:
   cpu: "700m"
   memory: "200Mi"
   criticality: 1
-  image: hello-world
+  image: nginx:latest
