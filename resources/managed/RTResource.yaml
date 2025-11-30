@@ -1,0 +1,142 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: rtresources.rtgroup.critical.com
+spec:
+  group: rtgroup.critical.com
+  names:
+    plural: rtresources
+    singular: rtresource
+    kind: RTResource
+    shortNames:
+    - rt
+  scope: Namespaced
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            required:
+            - criticality
+            - template
+            properties:
+              namespace:
+                type: string
+                minLength: 1
+                default: "realtime"
+                description: "Namespace where the application will be deployed"
+              replicas:
+                type: integer
+                minimum: 0
+                nullable: true
+                default: 0
+                description: "Number of desired replicas"
+              selector:
+                type: object
+                description: "Label selector for pods managed by this resource"
+                properties:
+                  matchLabels:
+                    type: object
+                    additionalProperties:
+                      type: string
+                  matchExpressions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        key:
+                          type: string
+                        operator:
+                          type: string
+                        values:
+                          type: array
+                          items:
+                            type: string
+              criticality:
+                type: integer
+                minimum: 1
+                maximum: 80
+                description: "Application criticality level (1-80)"
+              template:
+                type: object
+                description: "Template describes the pods that will be created"
+                properties:
+                  metadata:
+                    type: object
+                    description: "Metadata for the pods (labels, annotations)"
+                    x-kubernetes-preserve-unknown-fields: true
+                  spec:
+                    type: object
+                    description: "PodSpec defines the desired state of the pod"
+                    x-kubernetes-preserve-unknown-fields: true
+          status:
+            type: object
+            properties:
+              observedGeneration:
+                type: integer
+                format: int64
+                description: "The generation of the spec that was last processed by the controller"
+              desiredReplicas:
+                type: integer
+                format: int32
+                description: "Number of desired replicas"
+              replicas:
+                type: integer
+                format: int32
+                description: "Current number of ready replicas"
+              conditions:
+                type: array
+                items:
+                  type: object
+                  required:
+                  - type
+                  - status
+                  properties:
+                    type:
+                      type: string
+                      description: "Type of condition (Ready, Progressing)"
+                    status:
+                      type: string
+                      enum:
+                      - "True"
+                      - "False"
+                      - "Unknown"
+                      description: "Status of the condition"
+                    lastTransitionTime:
+                      type: string
+                      format: date-time
+                      description: "Last time the condition transitioned from one status to another"
+                    reason:
+                      type: string
+                      description: "Machine-readable reason for the condition's last transition"
+                    message:
+                      type: string
+                      description: "Human-readable message indicating details about the transition"
+    subresources:
+      status: {}
+    additionalPrinterColumns:
+    - name: Criticality
+      type: integer
+      jsonPath: .spec.criticality
+      description: "Criticality level"
+    - name: Desired
+      type: integer
+      jsonPath: .status.desiredReplicas
+      description: "Desired replicas"
+    - name: Replicas
+      type: integer
+      jsonPath: .status.replicas
+      description: "Current replicas"
+    - name: Ready
+      type: string
+      jsonPath: .status.conditions[?(@.type=='Ready')].status
+      description: "Ready condition"
+    - name: Age
+      type: date
+      jsonPath: .metadata.creationTimestamp
+      description: "Age of the resource"
