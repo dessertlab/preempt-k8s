@@ -124,7 +124,7 @@ pub extern "C" fn server(thread_data: *mut c_void) -> *mut c_void {
                         eprintln!("Server - An error occurred while creating a Watchdog thread!");
                         error_count = error_count + 1;
                         if error_count > 5 {
-                            eprintln!("Server - Too many errors occurred while creating watchdog threads. Exiting...");
+                            eprintln!("Server - Too many errors occurred while creating watchdog threads! Exiting...");
                             break 'outer;
                         }
                     } else {

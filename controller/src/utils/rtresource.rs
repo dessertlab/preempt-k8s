@@ -45,7 +45,7 @@ pub struct Selector {
 RTResource specification
 */
 #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
-#[kube(group = "rtgroup.critical.com", version = "v1", kind = "RTResource", namespaced)]
+#[kube(group = "rtgroup.critical.com", version = "v1", kind = "RTResource", namespaced, status = "RTResourceStatus")]
 pub struct RTResourceSpec {
     /*
     Namespace where to deploy
