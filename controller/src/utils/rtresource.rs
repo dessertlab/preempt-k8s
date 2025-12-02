@@ -11,6 +11,10 @@ use serde::{
     Deserialize,
     Serialize
 };
+use k8s_openapi::{
+    apimachinery::pkg::apis::meta::v1::ObjectMeta,
+    api::core::v1::PodSpec
+};
 
 
 /*
@@ -18,8 +22,10 @@ Pod template specification
 */
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
 pub struct Template {
-    pub metadata: Option<BTreeMap<String, serde_json::Value>>,
-    pub spec: Option<BTreeMap<String, serde_json::Value>>,
+    #[schemars(skip)]
+    pub metadata: Option<ObjectMeta>,
+    #[schemars(skip)]
+    pub spec: Option<PodSpec>,
 }
 
 /*

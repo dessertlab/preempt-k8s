@@ -17,6 +17,8 @@ use libc::{
 use kube::api::ListParams;
 
 use crate::utils::vars::SharedState;
+use crate::components::scheduling::create_pod;
+use crate::components::scheduling::delete_pod;
 
 
 
@@ -123,31 +125,24 @@ pub extern "C" fn watchdog(thread_data: *mut c_void) -> *mut c_void {
                     equal to the UID of the RTResource) and, then we compare the number of deployed replicas 
                     to the desired one and decide whether to scale up or down.
 		        	*/
-                    Ok(cr) => {
-		        		println!("Resource Found!");
-					let pod_api: Api<Pod> = Api::namespaced(client.clone(), &cr.spec.namespace.as_str());
-					let label_selector = format!("crd_id={}", &message);
-					let lp_pod = ListParams {
-					    label_selector: Some(label_selector),
-					    resource_version: Some("0".to_string()),
-					    ..ListParams::default()
-					};
-					let pod_list = pod_api.list(&lp_pod).await.unwrap();
-					let pod_count = pod_list.items.len();
-					let desired = cr.spec.replicaCount;
-					let mut difference = desired - (pod_count as i32);
-					if (desired as usize) < pod_count {
-						difference = -difference;
-						for i in pod_list.items.iter().take(difference as usize) {
-						    delete_pod(client.clone(), &cr.spec.namespace, &i.metadata.uid.as_deref().unwrap_or(""), &i.metadata.name.clone().unwrap_or("".to_string())).await;
-						}
-					}
-					else if (desired as usize) > pod_count {
-						for i in 0..difference {
-						    create_pod(client.clone(), &cr.spec, &message, cr.spec.criticality.to_string().as_str()).await;
-						}
-					}
-		        	}
+                    Ok(r) => {
+		        		println!("Watchdog - Resource {} found!", uid.as_str());
+                        let pod_lp = kube::api::ListParams::default()
+                            .labels(&format!("rtresource_id={}", uid));
+                        let pod_list = shared_state.context.pods.list(&pod_lp).await.unwrap();
+                        let pod_count = pod_list.items.len() as i32;
+                        let desired_pod_count = r.spec.replicas;
+                        let mut pods_needed = (desired_pod_count - pod_count as i32).abs();
+                        if desired_pod_count > pod_count {
+                            for i in 0..difference {
+                                create_pod("Watchdog".to_string(), shared_state.context.client, &r).await;
+                            }
+                        } else if desired_pod_count < pod_count {
+                            for i in pod_list.items.iter().take(pods_needed as usize) {
+                                delete_pod("Watchdog".to_string(), shared_state.context.client, i.clone()).await;
+                            }
+                        }
+                    }
 		        	Err(e) => {
 		        		match e.to_string().find("404") {
 		        			Some(found) => {

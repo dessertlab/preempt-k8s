@@ -8,12 +8,7 @@ use std::{
     mem,
     ptr,
     error::Error,
-    collections::BTreeMap,
-    ffi::c_void,
-    time::{
-        SystemTime,
-        UNIX_EPOCH
-    }
+    ffi::c_void
 };
 use libc::{
     pthread_t,
@@ -40,23 +35,7 @@ use libc::{
     pthread_mutexattr_setprotocol,
     pthread_mutexattr_destroy
 };
-use kube::{
-    Client,
-    Api,
-    api::{
-        PostParams,
-        DeleteParams
-    }
-};
-use k8s_openapi::{
-    apimachinery::pkg::api::resource::Quantity,
-    api::core::v1::{
-        Pod,
-        PodSpec,
-        Container,
-        ResourceRequirements
-    }
-};
+use kube::Client;
 use anyhow::Result;
 
 mod utils;
@@ -199,74 +178,4 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
     }
     
     Ok(())
-}
-
-//This function creates a Pod according to our Custom Resource Specification
-async fn create_pod(client: Client, crd: &RTResourceSpec, crd_id: &str, criticality: &str) -> Result<(), Box<dyn Error>> {
-
-    let pod_api: Api<Pod> = Api::namespaced(client, crd.namespace.clone().as_str());
-    let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards!").as_millis().to_string();
-    let pod_name = format!("{}-{}", crd_id, timestamp);
-    let pod = Pod {
-        metadata: kube::core::ObjectMeta {
-            name: Some(pod_name.clone()),
-            labels: Some({
-                let mut labels = BTreeMap::new();
-                labels.insert("crd_id".to_string(), crd_id.to_string());
-                labels.insert("criticality".to_string(), criticality.to_string());
-                labels
-            }),
-            ..Default::default()
-        },
-        spec: Some(PodSpec {
-            containers: vec![Container {
-                name: pod_name.clone(),
-                image: Some(crd.image.clone()),
-                resources: Some(ResourceRequirements {
-                    requests: Some({
-                        let mut requests = BTreeMap::new();
-                        requests.insert("cpu".to_string(), Quantity(crd.cpu.clone()));
-                        requests.insert("memory".to_string(), Quantity(crd.memory.clone()));
-                        requests
-                    }),
-                    claims: None,
-                    limits: None,
-                }),
-                ..Default::default()
-            }],
-            ..Default::default()
-        }),
-        ..Default::default()
-    };
-    
-    //We now schedule the created Pod on a certain node
-    let scheduled_pod = scheduling(pod);
-    
-    let pp = PostParams::default();
-    match pod_api.create(&pp, &scheduled_pod).await {
-        Ok(o) => println!("Pod created: {:?}.", o.metadata.name),
-        Err(e) => println!("An error occurred while creating the Pod: {}.", e),
-    }
-
-    Ok(())
-
-}
-
-//This function deletes a Pod
-async fn delete_pod(client: Client, namespace: &str, uid: &str, name: &str) -> Result<(), Box<dyn Error>> {
-    
-    let pod_api: Api<Pod> = Api::namespaced(client.clone(), namespace.clone());
-    if let Some(pod) = pod_api.get(name).await.ok() {
-        if let Some(pod_uid) = &pod.metadata.uid.clone() {
-            if pod_uid == uid {
-                pod_api.delete(name, &DeleteParams::default()).await?;
-                println!("Pod {} removed from namespace {}!", name, namespace);
-            }
-        }
-    } else {
-        println!("This Pod {} doesn't exist in this namespace {}!", name, namespace);
-    }
-
-    Ok(())
-
 }
