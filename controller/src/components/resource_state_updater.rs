@@ -8,8 +8,11 @@ use std::{
     ptr,
     ffi::c_void
 };
+use kube::Api;
 
 use crate::utils::vars::SharedState;
+use crate::utils::rtresource::RTResource;
+
 
 
 
@@ -71,6 +74,7 @@ pub extern "C" fn resource_state_updater(thread_data: *mut c_void) -> *mut c_voi
                                 Otherwise, we only update the replicas count.
                                 */
                                 let mut new_status = r.status.clone().unwrap_or_default();
+                                
                                 new_status.replicas = Some(running_count);
 
                                 let mut new_conditions = new_status.conditions.unwrap_or_default();
@@ -98,7 +102,11 @@ pub extern "C" fn resource_state_updater(thread_data: *mut c_void) -> *mut c_voi
                                 server for the RTResource.
                                 */
                                 let status_json = serde_json::to_vec(&new_status).unwrap();
-                                match shared_state.context.rt_resources.replace_status(
+                                let rtresource_namespaced_api = Api::<RTResource>::namespaced(
+                                    shared_state.context.client.clone(),
+                                    r.metadata.namespace.as_ref().unwrap()
+                                );
+                                match rtresource_namespaced_api.replace_status(
                                     &r.metadata.name.as_ref().unwrap(),
                                     &Default::default(),
                                     status_json

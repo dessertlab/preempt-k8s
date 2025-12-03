@@ -12,11 +12,27 @@ use std::{
     ffi::c_void
 };
 use libc::{
-    O_RDONLY, SCHED_FIFO, mq_attr, mq_close, mq_open, mq_receive, mq_unlink, mqd_t, pthread_cond_signal, pthread_getschedparam, pthread_mutex_lock, pthread_mutex_unlock, pthread_self, pthread_setschedparam, sched_param
+    sched_param,
+    SCHED_FIFO,
+    pthread_self,
+    pthread_setschedparam,
+    pthread_getschedparam,
+    mqd_t,
+    O_RDONLY,
+    mq_attr,
+    mq_open,
+    mq_unlink,
+    mq_close,
+    mq_receive,
+    pthread_cond_signal,
+    pthread_mutex_lock,
+    pthread_mutex_unlock
 };
-use kube::api::ListParams;
+use kube::Api;
 
 use crate::utils::vars::SharedState;
+use crate::utils::rtresource::RTResource;
+
 use crate::components::scheduling::create_pod;
 use crate::components::scheduling::delete_pod;
 
@@ -24,7 +40,7 @@ use crate::components::scheduling::delete_pod;
 
 pub extern "C" fn watchdog(thread_data: *mut c_void) -> *mut c_void {
 
-    let shared_state = unsafe {&*(thread_data as *mut SharedState)};
+    let shared_state = unsafe {&mut*(thread_data as *mut SharedState)};
     
     //We open the queue to retrieve the Event to handle
     unsafe {
@@ -107,12 +123,16 @@ pub extern "C" fn watchdog(thread_data: *mut c_void) -> *mut c_void {
     	    pthread_getschedparam(thread, &mut debug_policy, &mut debug_param);
     	    println!("Watchdog - Started handling event with priority {}!", debug_param.sched_priority);
 
+            let client = shared_state.context.client.clone();
+            let rtresource_api = shared_state.context.rt_resources.clone();
+            let pods_api = shared_state.context.pods.clone();
+            let uid_clone = uid.clone();
             shared_state.runtime.block_on(async {
                 /*
                 We proceed to acquire the RTResource
                 wirh the corresponding UID.
                 */
-		        match shared_state.context.rt_resources.get(uid.as_str()).await {
+		        match rtresource_api.get(uid_clone.as_str()).await {
 		        	/*
                     The next step is to understand wether the RTResource still exists or not.
                     If it doesn't exist, it means that it has been deleted and we have to delete
@@ -126,60 +146,84 @@ pub extern "C" fn watchdog(thread_data: *mut c_void) -> *mut c_void {
                     to the desired one and decide whether to scale up or down.
 		        	*/
                     Ok(r) => {
-		        		println!("Watchdog - Resource {} found!", uid.as_str());
+		        		println!("Watchdog - The RTResource {} was either created/updated or some of its pods were deleted!", uid_clone.as_str());
+
+                        let mut new_rtresource_status = r.status.clone().unwrap_or_default();
+
+                        new_rtresource_status.observed_generation = r.metadata.generation;
+
+                        new_rtresource_status.desired_replicas = Some(r.spec.replicas);
+
+                        let mut new_rtresource_conditions =  new_rtresource_status.conditions.unwrap_or_default();
+                        for cond in &mut new_rtresource_conditions {
+                            if cond.condition_type == "Progressing" {
+                                cond.status = "True".to_string();
+                                cond.reason = Some("RTResource Spec changed!".to_string());
+                                cond.message = Some("RTResource Spec changed!!".to_string());
+                                cond.last_transition_time = Some(chrono::Utc::now().to_rfc3339());
+                            }
+                            if cond.condition_type == "Ready" {
+                                cond.status = "False".to_string();
+                                cond.reason = Some("RTResource Spec changed!!".to_string());
+                                cond.message = Some("RTResource Spec changed!!".to_string());
+                                cond.last_transition_time = Some(chrono::Utc::now().to_rfc3339());
+                            }
+                        }
+                        new_rtresource_status.conditions = Some(new_rtresource_conditions);
+
+                        let rtresource_status_json = serde_json::to_vec(&new_rtresource_status).unwrap();
+                        let rtresource_namespaced_api = Api::<RTResource>::namespaced(
+                            client.clone(),
+                            r.metadata.namespace.as_ref().unwrap()
+                        );
+                        match rtresource_namespaced_api.replace_status(
+                            &r.metadata.name.as_ref().unwrap(),
+                            &Default::default(),
+                            rtresource_status_json
+                        ).await {
+                            Ok(_) => {
+                                println!("State Updater - Updated status for RTResource: {}", uid_clone);
+                            }
+                            Err(e) => {
+                                eprintln!("State Updater - An error occurred while updating status for RTResource {}: {}", uid_clone, e);
+                            }
+                        }
+
                         let pod_lp = kube::api::ListParams::default()
-                            .labels(&format!("rtresource_id={}", uid));
-                        let pod_list = shared_state.context.pods.list(&pod_lp).await.unwrap();
+                            .labels(&format!("rtresource_id={}", uid_clone));
+                        let pod_list = pods_api.list(&pod_lp).await.unwrap();
                         let pod_count = pod_list.items.len() as i32;
                         let desired_pod_count = r.spec.replicas;
-                        let mut pods_needed = (desired_pod_count - pod_count as i32).abs();
+                        let pods_needed = (desired_pod_count - pod_count as i32).abs();
                         if desired_pod_count > pod_count {
-                            for i in 0..difference {
-                                create_pod("Watchdog".to_string(), shared_state.context.client, &r).await;
+                            for _i in 0..pods_needed {
+                                if let Err(e) = create_pod("Watchdog".to_string(), client.clone(), &r).await{
+                                    eprintln!("{}", e);
+                                }
                             }
                         } else if desired_pod_count < pod_count {
                             for i in pod_list.items.iter().take(pods_needed as usize) {
-                                delete_pod("Watchdog".to_string(), shared_state.context.client, i.clone()).await;
+                                if let Err(e) = delete_pod("Watchdog".to_string(), client.clone(), i.clone()).await{
+                                    eprintln!("{}", e);
+                                }
                             }
                         }
                     }
 		        	Err(e) => {
 		        		match e.to_string().find("404") {
-		        			Some(found) => {
-		        				println!("Resource Not Found!");
-							let pod_api: Api<Pod> = Api::namespaced(client.clone(), datas.context.namespace.clone().as_str());
-							let pod_api_critical: Api<Pod> = Api::namespaced(client.clone(), "critical-resource");
-							let pod_api_second: Api<Pod> = Api::namespaced(client.clone(), "second-resource");
-							let label_selector = format!("crd_id={}", &message);
-							let lp_pod = ListParams {
-							    label_selector: Some(label_selector),
-							    resource_version: Some("0".to_string()),
-							    ..ListParams::default()
-							};
-							let mut pod_list = match pod_api.list(&lp_pod).await {
-								Ok(list) => list,
-								Err(_) => kube::api::ObjectList { items: vec![], metadata: kube::api::ListMeta::default() }
-							};
-							let mut critical_pod_list = match pod_api_critical.list(&lp_pod).await {
-								Ok(list) => list,
-								Err(_) => kube::api::ObjectList { items: vec![], metadata: kube::api::ListMeta::default() }
-							};
-							let mut second_pod_list = match pod_api_second.list(&lp_pod).await {
-								Ok(list) => list,
-								Err(_) => kube::api::ObjectList { items: vec![], metadata: kube::api::ListMeta::default() }
-							};
-							for i in pod_list.items.iter() {
-								delete_pod(client.clone(), &datas.context.namespace, &i.metadata.uid.as_deref().unwrap_or(""), &i.metadata.name.clone().unwrap_or("".to_string())).await;
-							}
-							for i in critical_pod_list.items.iter() {
-								delete_pod(client.clone(), "critical-resource", &i.metadata.uid.as_deref().unwrap_or(""), &i.metadata.name.clone().unwrap_or("".to_string())).await;
-							}
-							for i in second_pod_list.items.iter() {
-								delete_pod(client.clone(), "second-resource", &i.metadata.uid.as_deref().unwrap_or(""), &i.metadata.name.clone().unwrap_or("".to_string())).await;
-							}
-		        			}
+		        			Some(_found) => {
+		        				println!("Watchdog - The RTResource {} was deleted!", uid_clone.as_str());
+                                let pod_lp = kube::api::ListParams::default()
+                                    .labels(&format!("rtresource_id={}", uid_clone));
+                                let pod_list = pods_api.list(&pod_lp).await.unwrap();
+                                for i in pod_list.items.iter() {
+                                    if let Err(e) = delete_pod("Watchdog".to_string(), client.clone(), i.clone()).await{
+                                        eprintln!("{}", e);
+                                    }
+                                }
+                                }
 		        			None => {
-		        				println!("An error occurred while retrieving Custom Resource List: {}", e);
+		        				println!("Watchdog - An error occurred while retrieving Custom Resource List: {}", e);
 		        			}
 		        		}
 		        	}

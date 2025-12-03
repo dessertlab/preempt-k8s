@@ -32,7 +32,7 @@ use crate::components::watchdog::watchdog;
 
 
 pub extern "C" fn server(thread_data: *mut c_void) -> *mut c_void {
-	let shared_data = unsafe {&*(thread_data as *mut SharedState)};
+	let shared_data = unsafe {&mut *(thread_data as *mut SharedState)};
 	
 	unsafe {
         /*
@@ -93,7 +93,7 @@ pub extern "C" fn server(thread_data: *mut c_void) -> *mut c_void {
             let difference = shared_data.active_threads - shared_data.working_threads as usize;
             let currently_active = shared_data.active_threads;
             if difference < shared_data.config.threshold {
-                let mut needed = shared_data.config.threshold - difference;
+                let needed = shared_data.config.threshold - difference;
                 let mut new_active = shared_data.active_threads + needed;
                 if new_active > shared_data.config.max_watchdogs {
                     shared_data.active_threads = shared_data.config.max_watchdogs;
