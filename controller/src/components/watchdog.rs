@@ -31,6 +31,7 @@ use libc::{
 use kube::Api;
 
 use crate::utils::vars::SharedState;
+use crate::utils::vars::QueueMessage;
 use crate::utils::rtresource::RTResource;
 
 use crate::components::scheduling::create_pod;
@@ -81,9 +82,9 @@ pub extern "C" fn watchdog(thread_data: *mut c_void) -> *mut c_void {
             Once events are available, it will retrieve the
             higher priority one not already collected by
             concurrent watchdogs.
-            The message retrieved is the UID of the RTResource
-            related to the event and a priority equal
-            to the criticality level.
+            The message retrieved containe name, UID and
+            namespace of the RTResource related to the event
+            and a priority equal to the criticality level.
             */
             let mut msg: [u8; 1024] = [0; 1024];
             let mut criticality: u32 = 0;
@@ -97,10 +98,22 @@ pub extern "C" fn watchdog(thread_data: *mut c_void) -> *mut c_void {
                 eprintln!("Watchdog - An error occurred while retrieving a message from the queue!");
                 continue;
             }
-            let uid = String::from_utf8(msg.to_vec())
-                .unwrap_or_else(|_| String::from("Invalid UTF-8"))
-                .trim_matches(char::from(0))
-                .to_string();
+            let actual_data = &msg[..result as usize];
+            let rtresource_data = match QueueMessage::from_bytes(actual_data) {
+                Ok(data) => {
+                    data
+                },
+                Err(e) => {
+                    eprintln!("Watchdog - An error occurred while deserializing the message from the queue: {}", e);
+                    continue;
+                }
+            };
+            println!(
+                "Watchdog - Retrieved event for RTResource {}, {} in namespace {}!",
+                rtresource_data.name,
+                rtresource_data.uid,
+                rtresource_data.namespace
+            );
             
             /*
             The event server must be aware theat the watchdog
@@ -124,15 +137,20 @@ pub extern "C" fn watchdog(thread_data: *mut c_void) -> *mut c_void {
     	    println!("Watchdog - Started handling event with priority {}!", debug_param.sched_priority);
 
             let client = shared_state.context.client.clone();
-            let rtresource_api = shared_state.context.rt_resources.clone();
+            let rtresource_api = Api::<RTResource>::namespaced(
+                shared_state.context.client.clone(),
+                rtresource_data.namespace.as_str()
+            );
             let pods_api = shared_state.context.pods.clone();
-            let uid_clone = uid.clone();
+            let pod_lp = kube::api::ListParams::default()
+                .labels(&format!("rtresource_id={}", rtresource_data.uid));
+            let rtresource_data_clone = rtresource_data.clone();
             shared_state.runtime.block_on(async {
                 /*
                 We proceed to acquire the RTResource
                 wirh the corresponding UID.
                 */
-		        match rtresource_api.get(uid_clone.as_str()).await {
+		        match rtresource_api.get(rtresource_data_clone.name.as_str()).await {
 		        	/*
                     The next step is to understand wether the RTResource still exists or not.
                     If it doesn't exist, it means that it has been deleted and we have to delete
@@ -146,8 +164,23 @@ pub extern "C" fn watchdog(thread_data: *mut c_void) -> *mut c_void {
                     to the desired one and decide whether to scale up or down.
 		        	*/
                     Ok(r) => {
-		        		println!("Watchdog - The RTResource {} was either created/updated or some of its pods were deleted!", uid_clone.as_str());
+		        		println!(
+                            "Watchdog - The RTResource {}, {} in namespace {} was either created/updated or some of its pods were deleted!",
+                            rtresource_data_clone.name,
+                            rtresource_data_clone.uid,
+                            rtresource_data_clone.namespace
+                        );
 
+                        /*
+                        If the RTResource exists, we must update its status first.
+                            1. We set the observed generation to the current one.
+                            2. We set the desired replicas to the current spec.replicas
+                               (current replicas will be updated by the status updater accordingly).
+                            3. We set the conditions accordingly:
+                                - Progressing = True
+                                - Ready = False
+                            4. We update the status in the apiserver.
+                        */
                         let mut new_rtresource_status = r.status.clone().unwrap_or_default();
 
                         new_rtresource_status.observed_generation = r.metadata.generation;
@@ -182,15 +215,29 @@ pub extern "C" fn watchdog(thread_data: *mut c_void) -> *mut c_void {
                             rtresource_status_json
                         ).await {
                             Ok(_) => {
-                                println!("State Updater - Updated status for RTResource: {}", uid_clone);
+                                println!(
+                                    "State Updater - Updated status for RTResource: {}, {} in namespace {}",
+                                    rtresource_data_clone.name,
+                                    rtresource_data_clone.uid,
+                                    rtresource_data_clone.namespace
+                                );
                             }
                             Err(e) => {
-                                eprintln!("State Updater - An error occurred while updating status for RTResource {}: {}", uid_clone, e);
+                                eprintln!(
+                                    "State Updater - An error occurred while updating status for RTResource {}, {} in namespace {}: {}",
+                                    rtresource_data_clone.name,
+                                    rtresource_data_clone.uid,
+                                    rtresource_data_clone.namespace,
+                                    e
+                                );
                             }
                         }
 
-                        let pod_lp = kube::api::ListParams::default()
-                            .labels(&format!("rtresource_id={}", uid_clone));
+                        /*
+                        Now we can proceed to scale the number of pods
+                        associated to the RTResource according to the desired
+                        number of replicas.
+                        */
                         let pod_list = pods_api.list(&pod_lp).await.unwrap();
                         let pod_count = pod_list.items.len() as i32;
                         let desired_pod_count = r.spec.replicas;
@@ -212,9 +259,17 @@ pub extern "C" fn watchdog(thread_data: *mut c_void) -> *mut c_void {
 		        	Err(e) => {
 		        		match e.to_string().find("404") {
 		        			Some(_found) => {
-		        				println!("Watchdog - The RTResource {} was deleted!", uid_clone.as_str());
-                                let pod_lp = kube::api::ListParams::default()
-                                    .labels(&format!("rtresource_id={}", uid_clone));
+		        				println!(
+                                    "Watchdog - The RTResource {}, {} in namespace {} was deleted!",
+                                    rtresource_data_clone.name,
+                                    rtresource_data_clone.uid,
+                                    rtresource_data_clone.namespace
+                                );
+
+                                /*
+                                If the RTResource received from the priority queue was deleted,
+                                then we must delete all the pods associated to it.
+                                */
                                 let pod_list = pods_api.list(&pod_lp).await.unwrap();
                                 for i in pod_list.items.iter() {
                                     if let Err(e) = delete_pod("Watchdog".to_string(), client.clone(), i.clone()).await{

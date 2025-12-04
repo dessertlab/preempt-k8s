@@ -1,0 +1,39 @@
+preempt_k8s:
+  general:
+    name: preempt-k8s
+    namespace: realtime
+  pod:
+    resources:
+      limits:
+        cpu: "5"
+        memory: "3Gi"
+      requests:
+        cpu: "4"
+        memory: "2Gi"
+    securityContext:
+      runAsUser: 0
+      runAsGroup: 0
+      fsGroup: 0
+      allowPrivilegeEscalation: false
+      privileged: true
+      readOnlyRootFilesystem: false
+      capabilities:
+        add:
+          - SYS_NICE
+          - IPC_OWNER
+          - SYS_ADMIN
+          - MKNOD
+          - SYS_RESOURCE
+    container:
+      name: preempt-k8s-controller
+      image:
+        repository: stefanost2000/preempt-k8s
+        tag: 1.0.0
+        pullPolicy: Always
+      port: 80
+  configMap:
+    MIN_WATCHDOGS: "10"
+    MAX_WATCHDOGS: "20"
+    THRESHOLD: "3"
+    EVENT_QUEUE: "/eventqueue"
+  

@@ -1,7 +1,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: preempt-k8s
+  name: {{ .Values.preempt_k8s.general.name }}
 rules:
   - apiGroups: ["rtgroup.critical.com"]
     resources: ["rtresources", "rtresources/status"]

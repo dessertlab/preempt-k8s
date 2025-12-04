@@ -16,6 +16,14 @@ use kube::{
     Api, Client
 };
 use k8s_openapi::api::core::v1::Pod;
+use serde::{
+    Deserialize,
+    Serialize
+};
+use bincode::{
+    serialize,
+    deserialize
+};
 use tokio::runtime::Runtime;
 
 use crate::utils::rtresource::RTResource;
@@ -119,4 +127,34 @@ pub fn new_shared_state(config: ControllerConfig, client: Client, cond: pthread_
             workers_number
         ],
     })
+}
+
+/*
+This struct represents the message in
+the event priority queue.
+*/
+#[derive(Clone, Serialize, Deserialize)]
+pub struct QueueMessage {
+    /*
+    The RTResource unique name
+    */
+    pub name: String,
+    /*
+    The RTResource unique identifier
+    */
+    pub uid: String,
+    /*
+    The RTResource namespace
+    */
+    pub namespace: String,
+}
+
+impl QueueMessage {
+    pub fn into_bytes(&self) -> Vec<u8> {
+        serialize(self).expect("Serialize QueueMessage Failed!")
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Box<dyn std::error::Error>> {
+        Ok(deserialize(bytes)?)
+    }
 }

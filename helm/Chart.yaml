@@ -1,0 +1,22 @@
+apiVersion: v2
+name: Preempt-K8s
+version: 1.0.0
+description: A Helm chart for a Real Time Kubernetes Controller to manage RTResource custom resources.
+type: application
+keywords:
+  - kubernetes
+  - rt-kubernetes
+  - real-time
+  - criticality
+  - controller
+  - preemptive controller
+  - rtresource
+home: https://github.com/dessertlab/rt-kubernetes
+sources:
+  - https://github.com/dessertlab/rt-kubernetes/controller
+maintainers:
+  - name: Stefano Toscano
+    email: stefano00.st@gmail.com
+  - name: Luigi De Simone
+    email: luigi.desimone@unina.it
+appVersion: "1.0.0"

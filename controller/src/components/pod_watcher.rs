@@ -29,6 +29,7 @@ use kube::runtime::watcher::{
 use futures::StreamExt;
 
 use crate::utils::vars::SharedState;
+use crate::utils::vars::QueueMessage;
 
 
 
@@ -42,6 +43,11 @@ pub extern "C" fn pod_watcher(thread_data: *mut c_void) -> *mut c_void {
 		We open it in write-only mode, since
 		this thread only sends messages to it.
 		*/
+        let mut msg = QueueMessage {
+			name: "".to_string(),
+			uid: "".to_string(),
+			namespace: "".to_string(),
+		};
         let mut queue_attr: mq_attr = { mem::zeroed() };
         queue_attr.mq_flags = 0;
         queue_attr.mq_maxmsg = 500;
@@ -61,8 +67,8 @@ pub extern "C" fn pod_watcher(thread_data: *mut c_void) -> *mut c_void {
         /*
 		Now we can start the event watcher for RTResources related Pods.
 		Each time an event is captured, we send a message to the
-		event priority queue with the uid of the related RTResource.
-		The message priority is set equal to the criticality
+		event priority queue with name, UID and namespace of the related
+        RTResource. The message priority is set equal to the criticality
 		level of the resource.
         Note: we use the Pods label "criticality" to filter RTResource related Pods
         and retrieve the application criticality level.
@@ -80,12 +86,22 @@ pub extern "C" fn pod_watcher(thread_data: *mut c_void) -> *mut c_void {
                 match event{
                     Ok(Event::Deleted(object)) => {
                         if let Some(labels) = &object.metadata.labels {
-                            if let (Some(msg), Some(critcality_str)) = (labels.get("rtresource_id"), labels.get("criticality")) {
+                            if let (Some(name), Some(uid), Some(namespace), Some(critcality_str)) = (
+                                labels.get("rtresource_name"),
+                                labels.get("rtresource_uid"),
+                                labels.get("rtresource_namespace"),
+                                labels.get("criticality")
+                            ) {
                                 if let Ok(criticality) = critcality_str.parse::<u32>() {
+                                    msg.name = name.clone();
+                                    msg.uid = uid.clone();
+                                    msg.namespace = namespace.clone();
                                     println!(
-                                        "Pod Watcher - Detected deletion of Pod {} related to RTResource {} with criticality {}.",
-                                        object.metadata.name.clone().expect("Pod name missing"),
-                                        msg,
+                                        "Pod Watcher - Detected deletion of Pod {} related to RTResource {}, {} in namespace {} with criticality {}.",
+                                        object.metadata.name.clone().unwrap(),
+                                        msg.name,
+                                        msg.uid,
+                                        msg.namespace,
                                         criticality
                                     );
                                     let mut c_msg = msg.clone().into_bytes();

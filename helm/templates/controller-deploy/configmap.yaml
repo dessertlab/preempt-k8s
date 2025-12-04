@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.preempt_k8s.general.name }}
+  namespace: {{ .Values.preempt_k8s.general.namespace }}
+  labels:
+    app: {{ .Values.preempt_k8s.general.name }}
+data:
+  MIN_WATCHDOGS: "{{ .Values.preempt_k8s.configMap.MIN_WATCHDOGS }}"
+  MAX_WATCHDOGS: "{{ .Values.preempt_k8s.configMap.MAX_WATCHDOGS }}"
+  THRESHOLD: "{{ .Values.preempt_k8s.configMap.THRESHOLD }}"
+  EVENT_QUEUE: "{{ .Values.preempt_k8s.configMap.EVENT_QUEUE }}"

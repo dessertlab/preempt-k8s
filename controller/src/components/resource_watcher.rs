@@ -29,6 +29,7 @@ use kube::runtime::watcher::{
 use futures::StreamExt;
 
 use crate::utils::vars::SharedState;
+use crate::utils::vars::QueueMessage;
 
 
 
@@ -42,6 +43,11 @@ pub extern "C" fn crd_watcher(thread_data: *mut c_void) -> *mut c_void {
 		We open it in write-only mode, since
 		this thread only sends messages to it.
 		*/
+		let mut msg = QueueMessage {
+			name: "".to_string(),
+			uid: "".to_string(),
+			namespace: "".to_string(),
+		};
     	let mut queue_attr: mq_attr = { mem::zeroed() };
 		queue_attr.mq_flags = 0;
 		queue_attr.mq_maxmsg = 500;
@@ -61,9 +67,9 @@ pub extern "C" fn crd_watcher(thread_data: *mut c_void) -> *mut c_void {
 		/*
 		Now we can start the event watcher for RTResources.
 		Each time an event is captured, we send a message to the
-		event priority queue with the uid of the involved RTResource.
-		The message priority is set equal to the criticality
-		level of the resource.
+		event priority queue with name, UID and namespace of
+		the involved RTResource. The message priority is set equal
+		to the criticality level of the resource.
 		*/
 		shared_state.runtime.block_on(async {
 			let watcher_config = Config {
@@ -77,10 +83,19 @@ pub extern "C" fn crd_watcher(thread_data: *mut c_void) -> *mut c_void {
 			while let Some(event) = watcher.next().await {
 				match event{
 					Ok(Event::Applied(object)) | Ok(Event::Deleted(object)) => {
-						if let Some(msg) = object.metadata.uid.clone() {
+						if let (Some(name), Some(uid), Some(namespace)) = (
+							object.metadata.name.clone(),
+							object.metadata.uid.clone(),
+							object.metadata.namespace.clone(),
+						) {
+							msg.name = name.clone();
+							msg.uid = uid.clone();
+							msg.namespace = namespace.clone();
 							println!(
-								"CRD Watcher - Detected event for RTResource {} with criticality {}",
-								msg,
+								"CRD Watcher - Detected event for RTResource {}, {} in namespace {} with criticality {}",
+								msg.name,
+								msg.uid,
+								msg.namespace,
 								object.spec.criticality
 							);
 							let mut c_msg = msg.clone().into_bytes();

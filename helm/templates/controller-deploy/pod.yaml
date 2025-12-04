@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ .Values.preempt_k8s.general.name }}
+  namespace: {{ .Values.preempt_k8s.general.namespace }}
+  labels:
+    app: {{ .Values.preempt_k8s.general.name }}
+spec:
+  serviceAccountName: {{ .Values.preempt_k8s.general.name }}
+  restartPolicy: {{ .Values.preempt_k8s.pod.restartPolicy }}
+  securityContext:
+    runAsUser: {{ .Values.preempt_k8s.pod.securityContext.runAsUser }}
+    runAsGroup: {{ .Values.preempt_k8s.pod.securityContext.runAsGroup }}
+    fsGroup: {{ .Values.preempt_k8s.pod.securityContext.fsGroup }}
+  nodeSelector:
+    node-role.kubernetes.io/control-plane: ""
+  tolerations:
+    - key: "node-role.kubernetes.io/control-plane"
+      operator: "Exists"
+      effect: "NoSchedule"
+  containers:
+    - name: {{ .Values.preempt_k8s.pod.container.name }}
+      image: {{ .Values.preempt_k8s.pod.container.image.repository }}:{{ .Values.preempt_k8s.pod.container.image.tag }}
+      imagePullPolicy: {{ .Values.preempt_k8s.pod.container.image.pullPolicy }}
+      ports:
+        - containerPort: {{ .Values.preempt_k8s.pod.container.port }}
+      envFrom:
+        - configMapRef:
+            name: {{ .Values.preempt_k8s.general.name }}
+      resources:
+        limits:
+          cpu: {{ .Values.preempt_k8s.pod.resources.limits.cpu }}
+          memory: {{ .Values.preempt_k8s.pod.resources.limits.memory }}
+        requests:
+          cpu: {{ .Values.preempt_k8s.pod.resources.requests.cpu }}
+          memory: {{ .Values.preempt_k8s.pod.resources.requests.memory }}
+      securityContext:
+        runAsUser: {{ .Values.preempt_k8s.pod.securityContext.runAsUser }}
+        runAsGroup: {{ .Values.preempt_k8s.pod.securityContext.runAsGroup }}
+        fsGroup: {{ .Values.preempt_k8s.pod.securityContext.fsGroup }}
+        allowPrivilegeEscalation: {{ .Values.preempt_k8s.pod.securityContext.allowPrivilegeEscalation }}
+        privileged: {{ .Values.preempt_k8s.pod.securityContext.privileged }}
+        readOnlyRootFilesystem: {{ .Values.preempt_k8s.pod.securityContext.readOnlyRootFilesystem }}
+        capabilities:
+          add:
+          {{- range .Values.preempt_k8s.pod.securityContext.capabilities.add }}
+          - {{ . }}
+          {{- end }}

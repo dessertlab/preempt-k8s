@@ -1,13 +1,12 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: Preempt-K8s
+  name: preempt-k8s
   namespace: realtime
   labels:
-    app: Preempt-K8s
+    app: preempt-k8s
 data:
   MIN_WATCHDOGS: "10"
   MAX_WATCHDOGS: "20"
   THRESHOLD: "3"
   EVENT_QUEUE: "/eventqueue"
-  
