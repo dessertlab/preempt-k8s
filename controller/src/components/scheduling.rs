@@ -71,8 +71,16 @@ pub async fn create_pod(thread_name: String, client: Client, rtresource: &RTReso
         }
     }
     labels.insert(
-        "rtresource_id".to_string(),
+        "rtresource_name".to_string(),
+        rtresource.metadata.name.clone().unwrap_or_default(),
+    );
+    labels.insert(
+        "rtresource_uid".to_string(),
         rtresource.metadata.uid.clone().unwrap_or_default(),
+    );
+    labels.insert(
+        "rtresource_namespace".to_string(),
+        rtresource.metadata.namespace.clone().unwrap_or_default(),
     );
     labels.insert(
         "criticality".to_string(),

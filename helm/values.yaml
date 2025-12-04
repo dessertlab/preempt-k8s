@@ -3,6 +3,7 @@ preempt_k8s:
     name: preempt-k8s
     namespace: realtime
   pod:
+    restartPolicy: Always
     resources:
       limits:
         cpu: "5"

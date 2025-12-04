@@ -41,10 +41,10 @@ pub extern "C" fn resource_state_updater(thread_data: *mut c_void) -> *mut c_voi
 
                                 /*
                                 1. We list the pods belonging to this RTResource
-                                identified by the label rtresource_id=uid.
+                                identified by the label rtresource_uid=uid.
                                 */
                                 let pod_lp = kube::api::ListParams::default()
-                                    .labels(&format!("rtresource_id={}", uid));
+                                    .labels(&format!("rtresource_uid={}", uid));
                                 let pods = match shared_state.context.pods.list(&pod_lp).await {
                                     Ok(pod_list) => pod_list.items,
                                     Err(e) => {

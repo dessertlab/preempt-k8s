@@ -61,7 +61,7 @@ pub struct RTResourceSpec {
     /*
     Number of Replicas
     */
-    pub replicas: i32,
+    pub replicas: Option<i32>,
     /*
     Selector to identify the pods
     related to this resource
@@ -82,6 +82,7 @@ Condition specification
 */
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
 pub struct Condition {
+    #[serde(rename = "type")]
     pub condition_type: String,
     pub status: String,
     pub last_transition_time: Option<String>,

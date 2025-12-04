@@ -143,7 +143,7 @@ pub extern "C" fn watchdog(thread_data: *mut c_void) -> *mut c_void {
             );
             let pods_api = shared_state.context.pods.clone();
             let pod_lp = kube::api::ListParams::default()
-                .labels(&format!("rtresource_id={}", rtresource_data.uid));
+                .labels(&format!("rtresource_uid={}", rtresource_data.uid));
             let rtresource_data_clone = rtresource_data.clone();
             shared_state.runtime.block_on(async {
                 /*
@@ -185,7 +185,7 @@ pub extern "C" fn watchdog(thread_data: *mut c_void) -> *mut c_void {
 
                         new_rtresource_status.observed_generation = r.metadata.generation;
 
-                        new_rtresource_status.desired_replicas = Some(r.spec.replicas);
+                        new_rtresource_status.desired_replicas = r.spec.replicas;
 
                         let mut new_rtresource_conditions =  new_rtresource_status.conditions.unwrap_or_default();
                         for cond in &mut new_rtresource_conditions {
@@ -240,7 +240,7 @@ pub extern "C" fn watchdog(thread_data: *mut c_void) -> *mut c_void {
                         */
                         let pod_list = pods_api.list(&pod_lp).await.unwrap();
                         let pod_count = pod_list.items.len() as i32;
-                        let desired_pod_count = r.spec.replicas;
+                        let desired_pod_count = r.spec.replicas.unwrap_or(0);
                         let pods_needed = (desired_pod_count - pod_count as i32).abs();
                         if desired_pod_count > pod_count {
                             for _i in 0..pods_needed {
