@@ -15,7 +15,7 @@ preempt_k8s:
       runAsUser: 0
       runAsGroup: 0
       fsGroup: 0
-      allowPrivilegeEscalation: false
+      allowPrivilegeEscalation: true
       privileged: true
       readOnlyRootFilesystem: false
       capabilities:

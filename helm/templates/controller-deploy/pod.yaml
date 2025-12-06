@@ -37,7 +37,6 @@ spec:
       securityContext:
         runAsUser: {{ .Values.preempt_k8s.pod.securityContext.runAsUser }}
         runAsGroup: {{ .Values.preempt_k8s.pod.securityContext.runAsGroup }}
-        fsGroup: {{ .Values.preempt_k8s.pod.securityContext.fsGroup }}
         allowPrivilegeEscalation: {{ .Values.preempt_k8s.pod.securityContext.allowPrivilegeEscalation }}
         privileged: {{ .Values.preempt_k8s.pod.securityContext.privileged }}
         readOnlyRootFilesystem: {{ .Values.preempt_k8s.pod.securityContext.readOnlyRootFilesystem }}
