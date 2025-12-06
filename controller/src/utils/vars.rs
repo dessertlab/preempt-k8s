@@ -3,10 +3,7 @@ This File contains useful constants and variables used
 by the Preempt-K8s controller threads.
 */
 
-use std::{
-    ffi::CString,
-    sync::Arc
-};
+use std::ffi::CString;
 use libc::{
     pthread_t,
     pthread_cond_t,
@@ -24,7 +21,7 @@ use bincode::{
     serialize,
     deserialize
 };
-use tokio::runtime::Runtime;
+use tokio::runtime::Handle;
 
 use crate::utils::rtresource::RTResource;
 use crate::utils::configuration::*;
@@ -77,7 +74,7 @@ pub struct SharedState {
     /*
     The Tokio Runtime
     */
-    pub runtime: Runtime,
+    pub runtime_handle: Handle,
     /*
     The Condition Variable and Mutex used for sinchronization
     on common datas
@@ -106,15 +103,23 @@ pub struct SharedState {
 This function creates a new SharedState
 and initializes its fields.
 */
-pub fn new_shared_state(config: ControllerConfig, client: Client, cond: pthread_cond_t, mutex: pthread_mutex_t, queue_path: &str, workers_number: usize) -> Arc<SharedState> {
-    Arc::new(SharedState {
+pub fn new_shared_state(
+    config: ControllerConfig,
+    client: Client,
+    runtime_handle: Handle,
+    cond: pthread_cond_t,
+    mutex: pthread_mutex_t,
+    queue_path: &str,
+    workers_number: usize
+) -> Box<SharedState> {
+    Box::new(SharedState {
         config: config,
         context: ClientContext {
             client: client.clone(),
             rt_resources: Api::<RTResource>::all(client.clone()),
             pods: Api::<Pod>::all(client.clone()),
         },
-        runtime: Runtime::new().expect("Failed to create Tokio Runtime!"),
+        runtime_handle: runtime_handle,
         cond: cond,
         mutex: mutex,
         queue: CString::new(queue_path).expect("Failed to create Event Queue!"),

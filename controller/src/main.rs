@@ -36,6 +36,7 @@ use libc::{
     pthread_mutexattr_destroy
 };
 use kube::Client;
+use tokio::runtime::Runtime;
 use anyhow::Result;
 
 mod utils;
@@ -79,17 +80,24 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         let client = Client::try_default().await?;
 
         /*
+        We create the Tokio runtime.
+        */
+        let runtime = Runtime::new().expect("Failed to create Tokio Runtime!");
+
+        /*
         We must now create the shared state used by the controller threads
         using the information gathered up to this point.
         */
         let shared_state = new_shared_state(
             config.clone(),
             client.clone(),
+            runtime.handle().clone(),
             cond,
             mutex,
             config.event_queue_path.as_str(),
             config.max_watchdogs
         );
+        let share_state_ptr = Box::into_raw(shared_state) as *mut c_void;
 
         /*
         We must now create all the threads needed
@@ -120,7 +128,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
             &mut crd_watcher_thread,
             &attr as *const _ as *const pthread_attr_t,
             crd_watcher,
-            &shared_state as *const _ as *mut c_void
+            share_state_ptr
         );
         if result != 0 {
             eprintln!("An error occurred while creating the CRD Watcher thread! {}", result);
@@ -130,7 +138,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
             &mut pod_watcher_thread,
             &attr as *const _ as *const pthread_attr_t,
             pod_watcher,
-            &shared_state as *const _ as *mut c_void
+            share_state_ptr
         );
         if result != 0 {
             eprintln!("An error occurred while creating the Pod Event Watcher thread!");
@@ -140,7 +148,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
             &mut resource_state_updater_thread,
             &attr as *const _ as *const pthread_attr_t,
             resource_state_updater,
-            &shared_state as *const _ as *mut c_void
+            share_state_ptr
         );
         if result != 0 {
             eprintln!("An error occurred while creating the Resource State Updater thread!");
@@ -152,7 +160,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
             &mut server_thread,
             &attr as *const _ as *const pthread_attr_t,
             server,
-            &shared_state as *const _ as *mut c_void
+            share_state_ptr
         );
         if result != 0 {
             eprintln!("An error occurred while creating the Server thread! {}", result);

@@ -32,9 +32,9 @@ use crate::components::watchdog::watchdog;
 
 
 pub extern "C" fn server(thread_data: *mut c_void) -> *mut c_void {
-	let shared_data = unsafe {&mut *(thread_data as *mut SharedState)};
-	
 	unsafe {
+        let shared_state = &mut *(thread_data as *mut SharedState);
+
         /*
 		We must first set the pipeline initial conditions:
             - active_threads = min_watchdogs;
@@ -43,10 +43,10 @@ pub extern "C" fn server(thread_data: *mut c_void) -> *mut c_void {
         Note: in this phase there is no race condition for the shared state
         since no watchdogis active yet.
 		*/
-		shared_data.active_threads = shared_data.config.min_watchdogs;
-		for i in 0..shared_data.config.max_watchdogs {
-			shared_data.workers[i].id = 0;
-			shared_data.workers[i].active = false;
+		shared_state.active_threads = shared_state.config.min_watchdogs;
+		for i in 0..shared_state.config.max_watchdogs {
+			shared_state.workers[i].id = 0;
+			shared_state.workers[i].active = false;
 		}
         let mut last_working: usize = 0;
         
@@ -65,17 +65,17 @@ pub extern "C" fn server(thread_data: *mut c_void) -> *mut c_void {
 
 		param.sched_priority = 94;
 		pthread_attr_setschedparam(&mut attr, &param);
-		for i in 0..shared_data.config.min_watchdogs {
+		for i in 0..shared_state.config.min_watchdogs {
 		    result = pthread_create(
-                &mut shared_data.workers[i].id,
+                &mut shared_state.workers[i].id,
                 &attr as *const _ as *const pthread_attr_t,
                 watchdog,
-                &shared_data as *const _ as *mut c_void);
+                thread_data);
 		    if result != 0 {
 		        eprintln!("Server - An error occurred while creating a Watchdog thread!");
 		    }
-		    shared_data.workers[i].active = true;
-		    println!("Server - Watchdog {} is active: {}!", i, shared_data.workers[i].active);
+		    shared_state.workers[i].active = true;
+		    println!("Server - Watchdog {} is active: {}!", i, shared_state.workers[i].active);
 		}
 		
 		/*
@@ -85,39 +85,39 @@ pub extern "C" fn server(thread_data: *mut c_void) -> *mut c_void {
         */
 		'outer: loop {
             let mut error_count: usize = 0;
-			pthread_mutex_lock(&mut shared_data.mutex);
-			while shared_data.working_threads == last_working {
-                pthread_cond_wait(&mut shared_data.cond, &mut shared_data.mutex);
+			pthread_mutex_lock(&mut shared_state.mutex);
+			while shared_state.working_threads == last_working {
+                pthread_cond_wait(&mut shared_state.cond, &mut shared_state.mutex);
             }
-    		last_working = shared_data.working_threads;
-            let difference = shared_data.active_threads - shared_data.working_threads as usize;
-            let currently_active = shared_data.active_threads;
-            if difference < shared_data.config.threshold {
-                let needed = shared_data.config.threshold - difference;
-                let mut new_active = shared_data.active_threads + needed;
-                if new_active > shared_data.config.max_watchdogs {
-                    shared_data.active_threads = shared_data.config.max_watchdogs;
-                    new_active = shared_data.active_threads;
+    		last_working = shared_state.working_threads;
+            let difference = shared_state.active_threads - shared_state.working_threads as usize;
+            let currently_active = shared_state.active_threads;
+            if difference < shared_state.config.threshold {
+                let needed = shared_state.config.threshold - difference;
+                let mut new_active = shared_state.active_threads + needed;
+                if new_active > shared_state.config.max_watchdogs {
+                    shared_state.active_threads = shared_state.config.max_watchdogs;
+                    new_active = shared_state.active_threads;
                 } else {
-                    shared_data.active_threads = new_active;
+                    shared_state.active_threads = new_active;
                 }
-                pthread_mutex_unlock(&mut shared_data.mutex);
+                pthread_mutex_unlock(&mut shared_state.mutex);
                 let mut i: usize = 0;
                 while i < needed {
                     println!("Server - There will be a total of {} Active Threads!", new_active);
-                    if currently_active + i >= shared_data.config.max_watchdogs {
+                    if currently_active + i >= shared_state.config.max_watchdogs {
                         println!("Server - Max Thread Number reached!");
                         break;
                     }
                     let mut free = 0;
-                    while shared_data.workers[free].active == true {
+                    while shared_state.workers[free].active == true {
                         free = free + 1;
                     }
                     result = pthread_create(
-                        &mut shared_data.workers[free].id,
+                        &mut shared_state.workers[free].id,
                         &attr as *const _ as *const pthread_attr_t,
                         watchdog,
-                        &shared_data as *const _ as *mut c_void
+                        thread_data
                     );
                     if result != 0 {
                         i = i - 1;
@@ -128,14 +128,14 @@ pub extern "C" fn server(thread_data: *mut c_void) -> *mut c_void {
                             break 'outer;
                         }
                     } else {
-                        shared_data.workers[free].active = true;
+                        shared_state.workers[free].active = true;
                         println!("Server - Thread Created in position {}!", free);
                         i = i + 1;
                         error_count = 0;
                     }
                 }
             } else {
-                pthread_mutex_unlock(&mut shared_data.mutex);
+                pthread_mutex_unlock(&mut shared_state.mutex);
             }
 		}
 
@@ -147,9 +147,9 @@ pub extern "C" fn server(thread_data: *mut c_void) -> *mut c_void {
         */
         println!("Server - Something went wrong, no new watchdogs will be created! Restart the controller to recover!");
         println!("Server - Waiting for currently active watchdogs to terminate for graceful shutdown...");
-        for i in 0..shared_data.config.max_watchdogs {
-            if shared_data.workers[i].active {
-                pthread_join(shared_data.workers[i].id, ptr::null_mut());
+        for i in 0..shared_state.config.max_watchdogs {
+            if shared_state.workers[i].active {
+                pthread_join(shared_state.workers[i].id, ptr::null_mut());
             }
         }
 		
@@ -159,5 +159,5 @@ pub extern "C" fn server(thread_data: *mut c_void) -> *mut c_void {
         pthread_attr_destroy(&mut attr);
     }
         
-        ptr::null_mut()	
+    ptr::null_mut()	
 }

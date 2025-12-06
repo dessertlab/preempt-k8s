@@ -40,11 +40,9 @@ use crate::components::scheduling::delete_pod;
 
 
 pub extern "C" fn watchdog(thread_data: *mut c_void) -> *mut c_void {
-
-    let shared_state = unsafe {&mut*(thread_data as *mut SharedState)};
-    
-    //We open the queue to retrieve the Event to handle
     unsafe {
+        let shared_state = &mut *(thread_data as *mut SharedState);
+
         /*
         We get a reference to the watchdog itself
         for two main reasons:
@@ -145,7 +143,7 @@ pub extern "C" fn watchdog(thread_data: *mut c_void) -> *mut c_void {
             let pod_lp = kube::api::ListParams::default()
                 .labels(&format!("rtresource_uid={}", rtresource_data.uid));
             let rtresource_data_clone = rtresource_data.clone();
-            shared_state.runtime.block_on(async {
+            shared_state.runtime_handle.block_on(async {
                 /*
                 We proceed to acquire the RTResource
                 wirh the corresponding UID.

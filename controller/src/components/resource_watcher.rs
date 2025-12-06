@@ -34,9 +34,9 @@ use crate::utils::vars::QueueMessage;
 
 
 pub extern "C" fn crd_watcher(thread_data: *mut c_void) -> *mut c_void {
-    let shared_state = unsafe {&*(thread_data as *mut SharedState)};
-    
     unsafe {
+		let shared_state = &mut *(thread_data as *mut SharedState);
+
 		/*
 		We must first open the message queue
 		in case it is not already opened.
@@ -71,7 +71,7 @@ pub extern "C" fn crd_watcher(thread_data: *mut c_void) -> *mut c_void {
 		the involved RTResource. The message priority is set equal
 		to the criticality level of the resource.
 		*/
-		shared_state.runtime.block_on(async {
+		shared_state.runtime_handle.block_on(async {
 			let watcher_config = Config {
 				timeout: Some(100),
 				..Config::default()
