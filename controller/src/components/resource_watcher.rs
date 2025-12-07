@@ -70,6 +70,8 @@ pub extern "C" fn crd_watcher(thread_data: *mut c_void) -> *mut c_void {
 		event priority queue with name, UID and namespace of
 		the involved RTResource. The message priority is set equal
 		to the criticality level of the resource.
+		If the event is an addition or a modification, we only
+		filter for spec modifications.
 		*/
 		shared_state.runtime_handle.block_on(async {
 			let watcher_config = Config {
@@ -82,7 +84,45 @@ pub extern "C" fn crd_watcher(thread_data: *mut c_void) -> *mut c_void {
 			).boxed();
 			while let Some(event) = watcher.next().await {
 				match event{
-					Ok(Event::Applied(object)) | Ok(Event::Deleted(object)) => {
+					Ok(Event::Applied(object)) => {
+						if let (Some(name), Some(uid), Some(namespace)) = (
+							object.metadata.name.clone(),
+							object.metadata.uid.clone(),
+							object.metadata.namespace.clone(),
+						) {
+							let generation = object.metadata.generation.unwrap_or(0);
+							let observed_generation = object.status.as_ref()
+								.and_then(|s| s.observed_generation)
+								.unwrap_or(0);
+							if generation != observed_generation {
+								msg.name = name.clone();
+								msg.uid = uid.clone();
+								msg.namespace = namespace.clone();
+								println!(
+									"CRD Watcher - Detected event for RTResource {}, {} in namespace {} with criticality {}",
+									msg.name,
+									msg.uid,
+									msg.namespace,
+									object.spec.criticality
+								);
+								let mut c_msg = msg.clone().into_bytes();
+								c_msg.push(0);
+								let result = mq_send(
+									queue_des,
+									c_msg.as_ptr() as *const i8,
+									c_msg.len(),
+									object.spec.criticality
+								);
+								if result == -1 {
+									eprintln!("CRD Watcher - An error occurred while sending a message to the queue!");
+								}
+							}
+						} else {
+							eprintln!("CRD Watcher - An error occurred while retrieving RTResource metadata!");
+							continue;
+						}
+					}
+					Ok(Event::Deleted(object)) => {
 						if let (Some(name), Some(uid), Some(namespace)) = (
 							object.metadata.name.clone(),
 							object.metadata.uid.clone(),
@@ -92,7 +132,7 @@ pub extern "C" fn crd_watcher(thread_data: *mut c_void) -> *mut c_void {
 							msg.uid = uid.clone();
 							msg.namespace = namespace.clone();
 							println!(
-								"CRD Watcher - Detected event for RTResource {}, {} in namespace {} with criticality {}",
+								"CRD Watcher - Detected deletion of RTResource {}, {} in namespace {} with criticality {}",
 								msg.name,
 								msg.uid,
 								msg.namespace,
@@ -110,7 +150,7 @@ pub extern "C" fn crd_watcher(thread_data: *mut c_void) -> *mut c_void {
 								eprintln!("CRD Watcher - An error occurred while sending a message to the queue!");
 							}
 						} else {
-							eprintln!("CRD Watcher - An error occurred while retrieving the uid of the RTResource!");
+							eprintln!("CRD Watcher - An error occurred while retrieving the RTResource metadata!");
 							continue;
 						}
 					}

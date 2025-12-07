@@ -1,0 +1,33 @@
+apiVersion: rtgroup.critical.com/v1
+kind: RTResource
+metadata:
+  name: rt-critical-application
+  namespace: realtime
+spec:
+  namespace: realtime
+  replicas: 4
+  selector:
+    matchLabels:
+      app-selector: rt-critical-app
+  criticality: 1
+  template:
+    metadata:
+      name: rt-critical-pod
+      namespace: realtime
+      labels:
+        test-label: rt-critical-label
+      annotations:
+        test-annotation: rt-critical-annotation
+    spec:
+      containers:
+        - name: rt-critical-container
+          image: nginx:latest
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "700m"
+              memory: "200Mi"
+            limits:
+              cpu: "700m"
+              memory: "200Mi"

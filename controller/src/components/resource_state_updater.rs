@@ -102,7 +102,8 @@ pub extern "C" fn resource_state_updater(thread_data: *mut c_void) -> *mut c_voi
                                     4. We push the status update to the Kubernetes API
                                     server for the RTResource.
                                     */
-                                    let status_json = serde_json::to_vec(&new_status).unwrap();
+                                    let mut updated_resource = r.clone();
+                                    updated_resource.status = Some(new_status);
                                     let rtresource_namespaced_api = Api::<RTResource>::namespaced(
                                         shared_state.context.client.clone(),
                                         r.metadata.namespace.as_ref().unwrap()
@@ -110,7 +111,7 @@ pub extern "C" fn resource_state_updater(thread_data: *mut c_void) -> *mut c_voi
                                     match rtresource_namespaced_api.replace_status(
                                         &r.metadata.name.as_ref().unwrap(),
                                         &Default::default(),
-                                        status_json
+                                        serde_json::to_vec(&updated_resource).unwrap()
                                     ).await {
                                         Ok(_) => {
                                             println!("State Updater - Updated status for RTResource {}: replicas={}, desired={}", uid, running_count, desired_replicas);

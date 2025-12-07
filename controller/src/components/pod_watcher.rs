@@ -131,7 +131,7 @@ pub extern "C" fn pod_watcher(thread_data: *mut c_void) -> *mut c_void {
                         println!("{}", e);
                     }
                     _ => {
-                        println!("Nothing happened yet!");
+                        println!("Pod Watcher - Nothing happened yet!");
                     }
                 }
             }

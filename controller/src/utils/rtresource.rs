@@ -43,7 +43,9 @@ Selector specification
 */
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
 pub struct Selector {
+    #[serde(rename = "matchLabels")]
     pub match_labels: Option<BTreeMap<String, String>>,
+    #[serde(rename = "matchExpressions")]
     pub match_expressions: Option<Vec<MatchExpression>>,
 }
 
@@ -85,6 +87,7 @@ pub struct Condition {
     #[serde(rename = "type")]
     pub condition_type: String,
     pub status: String,
+    #[serde(rename = "lastTransitionTime")]
     pub last_transition_time: Option<String>,
     pub reason: Option<String>,
     pub message: Option<String>,
@@ -95,7 +98,9 @@ RTResource status specification
 */
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, Default)]
 pub struct RTResourceStatus {
+    #[serde(rename = "observedGeneration")]
     pub observed_generation: Option<i64>,
+    #[serde(rename = "desiredReplicas")]
     pub desired_replicas: Option<i32>,
     pub replicas: Option<i32>,
     pub conditions: Option<Vec<Condition>>,

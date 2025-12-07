@@ -112,7 +112,7 @@ pub async fn create_pod(thread_name: String, client: Client, rtresource: &RTReso
 
     let pp = PostParams::default();
     match pod_api.create(&pp, &scheduled_pod).await {
-        Ok(o) => println!("{} - Pod created: {:?}!", thread_name, o.metadata.name),
+        Ok(o) => println!("{} - Pod created: {}!", thread_name, o.metadata.name.as_ref().unwrap()),
         Err(e) => println!("{} - An error occurred while creating the Pod: {}!", thread_name, e),
     }
 

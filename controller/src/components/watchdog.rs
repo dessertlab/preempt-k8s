@@ -33,6 +33,7 @@ use kube::Api;
 use crate::utils::vars::SharedState;
 use crate::utils::vars::QueueMessage;
 use crate::utils::rtresource::RTResource;
+use crate::utils::rtresource::Condition;
 
 use crate::components::scheduling::create_pod;
 use crate::components::scheduling::delete_pod;
@@ -146,7 +147,7 @@ pub extern "C" fn watchdog(thread_data: *mut c_void) -> *mut c_void {
             shared_state.runtime_handle.block_on(async {
                 /*
                 We proceed to acquire the RTResource
-                wirh the corresponding UID.
+                with the corresponding UID.
                 */
 		        match rtresource_api.get(rtresource_data_clone.name.as_str()).await {
 		        	/*
@@ -174,7 +175,7 @@ pub extern "C" fn watchdog(thread_data: *mut c_void) -> *mut c_void {
                             1. We set the observed generation to the current one.
                             2. We set the desired replicas to the current spec.replicas
                                (current replicas will be updated by the status updater accordingly).
-                            3. We set the conditions accordingly:
+                            3. We set the conditions accordingly (creating them if it is a new RTResource):
                                 - Progressing = True
                                 - Ready = False
                             4. We update the status in the apiserver.
@@ -186,23 +187,42 @@ pub extern "C" fn watchdog(thread_data: *mut c_void) -> *mut c_void {
                         new_rtresource_status.desired_replicas = r.spec.replicas;
 
                         let mut new_rtresource_conditions =  new_rtresource_status.conditions.unwrap_or_default();
-                        for cond in &mut new_rtresource_conditions {
-                            if cond.condition_type == "Progressing" {
-                                cond.status = "True".to_string();
-                                cond.reason = Some("RTResource Spec changed!".to_string());
-                                cond.message = Some("RTResource Spec changed!!".to_string());
-                                cond.last_transition_time = Some(chrono::Utc::now().to_rfc3339());
-                            }
-                            if cond.condition_type == "Ready" {
-                                cond.status = "False".to_string();
-                                cond.reason = Some("RTResource Spec changed!!".to_string());
-                                cond.message = Some("RTResource Spec changed!!".to_string());
-                                cond.last_transition_time = Some(chrono::Utc::now().to_rfc3339());
+                        if new_rtresource_conditions.is_empty() {
+                            
+                            new_rtresource_conditions.push(Condition {
+                                condition_type: "Progressing".to_string(),
+                                status: "True".to_string(),
+                                reason: Some("RTResource created".to_string()),
+                                message: Some("RTResource is being processed".to_string()),
+                                last_transition_time: Some(chrono::Utc::now().to_rfc3339()),
+                            });
+                            new_rtresource_conditions.push(Condition {
+                                condition_type: "Ready".to_string(),
+                                status: "False".to_string(),
+                                reason: Some("RTResource created".to_string()),
+                                message: Some("Waiting for pods to be ready".to_string()),
+                                last_transition_time: Some(chrono::Utc::now().to_rfc3339()),
+                            });
+                        } else {
+                            for cond in &mut new_rtresource_conditions {
+                                if cond.condition_type == "Progressing" {
+                                    cond.status = "True".to_string();
+                                    cond.reason = Some("RTResource Spec changed!".to_string());
+                                    cond.message = Some("RTResource Spec changed!!".to_string());
+                                    cond.last_transition_time = Some(chrono::Utc::now().to_rfc3339());
+                                }
+                                if cond.condition_type == "Ready" {
+                                    cond.status = "False".to_string();
+                                    cond.reason = Some("RTResource Spec changed!!".to_string());
+                                    cond.message = Some("RTResource Spec changed!!".to_string());
+                                    cond.last_transition_time = Some(chrono::Utc::now().to_rfc3339());
+                                }
                             }
                         }
                         new_rtresource_status.conditions = Some(new_rtresource_conditions);
 
-                        let rtresource_status_json = serde_json::to_vec(&new_rtresource_status).unwrap();
+                        let mut updated_resource = r.clone();
+                        updated_resource.status = Some(new_rtresource_status);
                         let rtresource_namespaced_api = Api::<RTResource>::namespaced(
                             client.clone(),
                             r.metadata.namespace.as_ref().unwrap()
@@ -210,7 +230,7 @@ pub extern "C" fn watchdog(thread_data: *mut c_void) -> *mut c_void {
                         match rtresource_namespaced_api.replace_status(
                             &r.metadata.name.as_ref().unwrap(),
                             &Default::default(),
-                            rtresource_status_json
+                            serde_json::to_vec(&updated_resource).unwrap()
                         ).await {
                             Ok(_) => {
                                 println!(
