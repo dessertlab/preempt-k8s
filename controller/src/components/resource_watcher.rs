@@ -118,7 +118,7 @@ pub extern "C" fn crd_watcher(thread_data: *mut c_void) -> *mut c_void {
 						println!("{}", e);
 					}
 					_ => {
-						println!("Nothing happened yet!");
+						println!("CRD Watcher - Nothing happened yet!");
 					}
 				}
 			}
