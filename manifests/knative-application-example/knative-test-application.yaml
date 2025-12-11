@@ -1,0 +1,25 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: knative-critical-application
+  namespace: realtime
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/metric: concurrency
+        autoscaling.knative.dev/target: "10"
+        autoscaling.knative.dev/application-criticality-level: "1"
+    spec:
+      containers:
+        - name: knative-critical-container
+          image: nginx:latest
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "700m"
+              memory: "200Mi"
+            limits:
+              cpu: "700m"
+              memory: "200Mi"
