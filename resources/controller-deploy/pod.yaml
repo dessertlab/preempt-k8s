@@ -20,7 +20,7 @@ spec:
       effect: "NoSchedule"
   containers:
     - name: preempt-k8s-controller
-      image: stefanost2000/preempt-k8s:1.0.0
+      image: dessertunina/preempt-k8s:1.0.0
       imagePullPolicy: Always
       ports:
         - containerPort: 80
@@ -29,10 +29,10 @@ spec:
             name: preempt-k8s
       resources:
         limits:
-          cpu: "5"
+          cpu: "2"
           memory: "3Gi"
         requests:
-          cpu: "4"
+          cpu: "2"
           memory: "2Gi"
       securityContext:
         runAsUser: 0
