@@ -140,14 +140,13 @@ WARNING: at the moment, we only chose a random node frome those available.
 */
 fn scheduler(thread_name: String, mut pod: Pod) -> Pod {
     // TODO: take node list from apiserver
-    let random_number = rand::thread_rng().gen_range(1..=4);
+    let random_number = rand::thread_rng().gen_range(1..=3);
     let node_name: &str;
     match random_number {
-        1 => node_name = "orionw1",
-        2 => node_name = "orionw2",
-        3 => node_name = "orionw3",
-        4 => node_name = "orionw4",
-        _ => node_name = "orionw1" // Default
+        1 => node_name = "dessertw1",
+        2 => node_name = "dessertw2",
+        3 => node_name = "dessertw3",
+        _ => node_name = "dessertw1" // Default
     }
     
     if let Some(spec) = pod.spec.as_mut() {
