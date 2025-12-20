@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod
+  namespace: default
+spec:
+  securityContext:
+    runAsUser: 0
+    runAsGroup: 0
+  containers:
+    - name: test-container
+      image: curlimages/curl:latest
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          wget https://hey-release.s3.us-east-2.amazonaws.com/hey_linux_amd64
+          chmod +x hey_linux_amd64
+          mv hey_linux_amd64 hey
+          mv hey /bin/hey
+          tail -f /dev/null
+      resources:
+        requests:
+          memory: "64Mi"
+          cpu: "250m"
+        limits:
+          memory: "128Mi"
+          cpu: "500m"
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+        allowPrivilegeEscalation: true
+        privileged: true
+        readOnlyRootFilesystem: false
+      volumeMounts:
+        - name: experiments-results
+          mountPath: /experiments
+  volumes:
+    - name: experiments-results
+      persistentVolumeClaim:
+        claimName: experiments-results

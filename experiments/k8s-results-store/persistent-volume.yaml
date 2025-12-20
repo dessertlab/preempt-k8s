@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: experiments-results
+spec:
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  storageClassName: longhorn-retain
+  capacity:
+    storage: 10Gi
+  persistentVolumeReclaimPolicy: Retain
+  csi:
+    driver: driver.longhorn.io
+    volumeAttributes:
+      numberOfReplicas: "3"
+    volumeHandle: experiments-results
