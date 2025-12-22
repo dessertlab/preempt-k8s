@@ -50,7 +50,7 @@ pub extern "C" fn crd_watcher(thread_data: *mut c_void) -> *mut c_void {
 		};
     	let mut queue_attr: mq_attr = { mem::zeroed() };
 		queue_attr.mq_flags = 0;
-		queue_attr.mq_maxmsg = 500;
+		queue_attr.mq_maxmsg = 2000;
 		queue_attr.mq_msgsize = 256;
 		queue_attr.mq_curmsgs = 0;
 		let queue_des: mqd_t = mq_open(

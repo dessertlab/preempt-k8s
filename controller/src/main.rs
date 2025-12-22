@@ -112,7 +112,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         */
         let mut crd_watcher_thread: pthread_t = 0;
         let mut pod_watcher_thread: pthread_t = 0;
-        let mut resource_state_updater_thread: pthread_t = 0;
+        let mut resource_state_updater_thread: [pthread_t; 5] = [0; 5];
         let mut server_thread: pthread_t = 0;
         let mut attr: pthread_attr_t = mem::zeroed();
         let mut param: sched_param = sched_param{sched_priority: 0};
@@ -144,14 +144,16 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
             eprintln!("An error occurred while creating the Pod Event Watcher thread!");
         }
 
-        result = pthread_create(
-            &mut resource_state_updater_thread,
-            &attr as *const _ as *const pthread_attr_t,
-            resource_state_updater,
-            share_state_ptr
-        );
-        if result != 0 {
-            eprintln!("An error occurred while creating the Resource State Updater thread!");
+        for i in 0..resource_state_updater_thread.len() {
+            result = pthread_create(
+                &mut resource_state_updater_thread[i],
+                &attr as *const _ as *const pthread_attr_t,
+                resource_state_updater,
+                share_state_ptr
+            );
+            if result != 0 {
+                eprintln!("An error occurred while creating the Resource State Updater thread!");
+            }
         }
 
         param.sched_priority = 95;
@@ -174,6 +176,9 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         */
         pthread_join(crd_watcher_thread, ptr::null_mut());
         pthread_join(pod_watcher_thread, ptr::null_mut());
+        for i in 0..resource_state_updater_thread.len() {
+            pthread_join(resource_state_updater_thread[i], ptr::null_mut());
+        }
         pthread_join(server_thread, ptr::null_mut());
 
         /*
