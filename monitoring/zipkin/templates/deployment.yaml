@@ -1,0 +1,147 @@
+{{- /*
+Copyright 2023 The OpenZipkin Authors
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+in compliance with the License. You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed under the License
+is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+or implied. See the License for the specific language governing permissions and limitations under
+the License.
+*/}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "zipkin.fullname" . }}
+  namespace: {{ include "zipkin.namespace" . }}
+  labels:
+    {{- include "zipkin.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "zipkin.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "zipkin.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      automountServiceAccountToken: false
+      serviceAccountName: {{ include "zipkin.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+        {{- include "zipkin.extraInitContainers" . | nindent 6 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          {{- if .Values.command }}
+          command:
+            {{- range .Values.command }}
+            - {{ . }}
+            {{- end }}
+          {{- end }}
+          {{- if .Values.args }}
+          args:
+            {{- range .Values.args }}
+            - {{ . }}
+            {{- end }}
+          {{- end }}
+          env:
+            {{- if .Values.zipkin.selfTracing.enabled }}
+            - name: SELF_TRACING_ENABLED
+              value: "true"
+            {{- end }}
+            {{- if .Values.zipkin.discovery.eureka }}
+            {{- with .Values.zipkin.discovery.eureka }}
+            - name: EUREKA_SERVICE_URL
+              value: {{ .serviceUrl | quote }}
+            {{- if .app }}
+            - name: EUREKA_APP_NAME
+              value: {{ .app | quote }}
+            {{- end }}
+            {{- if .hostName }}
+            - name: EUREKA_APP_NAME
+              value: {{ .hostName | quote }}
+            {{- end }}
+            {{- if .instanceId }}
+            - name: EUREKA_INSTANCE_ID
+              value: {{ .instanceId | quote }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
+            - name: STORAGE_TYPE
+              value: "{{ .Values.zipkin.storage.type }}"
+            {{- if eq .Values.zipkin.storage.type "elasticsearch" }}
+            {{- with .Values.zipkin.storage.elasticsearch }}
+            - name: ES_HOSTS
+              value: {{ .hosts | quote }}
+            {{- if .index }}
+            - name: ES_INDEX
+              value: {{ .index | quote }}
+            {{- end }}
+            {{- if .username }}
+            - name: ES_USERNAME
+              value: {{ .username | quote }}
+            {{- end }}
+            {{- if .password }}
+            - name: ES_PASSWORD
+              value: {{ .password | quote }}
+            {{- end }}
+            {{- if .sslNoVerify }}
+            - name: ES_SSL_NO_VERIFY
+              value: "true"
+            {{- end }}
+            {{- end }}
+            {{- end }}
+            {{- range $key, $value := .Values.zipkin.extraEnv }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 9411
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            {{- with .Values.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+        {{- include "zipkin.extraContainers" . | nindent 6 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.priorityClassName }}
+      priorityClassName: {{ .Values.priorityClassName }}
+      {{- end }}
+      volumes:
+        {{- with .Values.volumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
