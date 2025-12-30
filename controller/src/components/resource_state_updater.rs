@@ -66,58 +66,67 @@ pub extern "C" fn resource_state_updater(thread_data: *mut c_void) -> *mut c_voi
                                     }).count() as i32;
 
                                     /*
-                                    3. We update the RTResource status with the
-                                    current number of running replicas and update
-                                    the conditions accordingly.
-                                    If the number of running replicas matches the desired one,
-                                    we set the "Progressing" to 'False' and "Ready" to 'True',
-                                    then we update running replicas status field.
-                                    Otherwise, we only update the replicas count.
+                                    3. Check if the pod running count has changed compared to
+                                    the current status. Only proceed with a status update if
+                                    there's an actual change.
                                     */
-                                    let mut new_status = r.status.clone().unwrap_or_default();
+                                    let current_replicas = r.status.as_ref().and_then(|s| s.replicas).unwrap_or(-1);
                                     
-                                    new_status.replicas = Some(running_count);
+                                    if current_replicas != running_count {
+                                        /*
+                                        4. We update the RTResource status with the
+                                        current number of running replicas and update
+                                        the conditions accordingly.
+                                        If the number of running replicas matches the desired one,
+                                        we set the "Progressing" to 'False' and "Ready" to 'True',
+                                        then we update running replicas status field.
+                                        Otherwise, we only update the replicas count.
+                                        */
+                                        let mut new_status = r.status.clone().unwrap_or_default();
+                                        
+                                        new_status.replicas = Some(running_count);
 
-                                    let mut new_conditions = new_status.conditions.unwrap_or_default();
-                                    if running_count == desired_replicas {
-                                        for cond in &mut new_conditions {
-                                            if cond.condition_type == "Progressing" {
-                                                cond.status = "False".to_string();
-                                                cond.reason = Some("All desired replicas are running!".to_string());
-                                                cond.message = Some("All desired replicas are running!".to_string());
-                                                cond.last_transition_time = Some(chrono::Utc::now().to_rfc3339());
-                                            }
-                                            if cond.condition_type == "Ready" {
-                                                cond.status = "True".to_string();
-                                                cond.reason = Some("All desired replicas are running!".to_string());
-                                                cond.message = Some("All desired replicas are running!".to_string());
-                                                cond.last_transition_time = Some(chrono::Utc::now().to_rfc3339());
+                                        let mut new_conditions = new_status.conditions.unwrap_or_default();
+                                        if running_count == desired_replicas {
+                                            for cond in &mut new_conditions {
+                                                if cond.condition_type == "Progressing" {
+                                                    cond.status = "False".to_string();
+                                                    cond.reason = Some("All desired replicas are running!".to_string());
+                                                    cond.message = Some("All desired replicas are running!".to_string());
+                                                    cond.last_transition_time = Some(chrono::Utc::now().to_rfc3339());
+                                                }
+                                                if cond.condition_type == "Ready" {
+                                                    cond.status = "True".to_string();
+                                                    cond.reason = Some("All desired replicas are running!".to_string());
+                                                    cond.message = Some("All desired replicas are running!".to_string());
+                                                    cond.last_transition_time = Some(chrono::Utc::now().to_rfc3339());
+                                                }
                                             }
                                         }
-                                    }
 
-                                    new_status.conditions = Some(new_conditions);
+                                        new_status.conditions = Some(new_conditions);
 
-                                    /*
-                                    4. We push the status update to the Kubernetes API
-                                    server for the RTResource.
-                                    */
-                                    let mut updated_resource = r.clone();
-                                    updated_resource.status = Some(new_status);
-                                    let rtresource_namespaced_api = Api::<RTResource>::namespaced(
-                                        shared_state.context.client.clone(),
-                                        r.metadata.namespace.as_ref().unwrap()
-                                    );
-                                    match rtresource_namespaced_api.replace_status(
-                                        &r.metadata.name.as_ref().unwrap(),
-                                        &Default::default(),
-                                        serde_json::to_vec(&updated_resource).unwrap()
-                                    ).await {
-                                        Ok(_) => {
-                                            println!("State Updater - Updated status for RTResource {}: replicas={}, desired={}", uid, running_count, desired_replicas);
-                                        }
-                                        Err(e) => {
-                                            eprintln!("State Updater - An error occurred while updating status for RTResource {}: {}", uid, e);
+                                        /*
+                                        5. We push the status update to the Kubernetes API
+                                        server for the RTResource.
+                                        */
+                                        let mut updated_resource = r.clone();
+                                        updated_resource.status = Some(new_status);
+                                        let rtresource_namespaced_api = Api::<RTResource>::namespaced(
+                                            shared_state.context.client.clone(),
+                                            r.metadata.namespace.as_ref().unwrap()
+                                        );
+                                        match rtresource_namespaced_api.replace_status(
+                                            &r.metadata.name.as_ref().unwrap(),
+                                            &Default::default(),
+                                            serde_json::to_vec(&updated_resource).unwrap()
+                                        ).await {
+                                            Ok(_) => {
+                                                println!("State Updater - Updated status for RTResource {}: replicas={}, desired={}", uid, running_count, desired_replicas);
+                                            }
+                                            Err(e) => {
+                                                eprintln!("State Updater - An error occurred while updating status for RTResource {}: {}", uid, e);
+                                            }
                                         }
                                     }
                                 }
