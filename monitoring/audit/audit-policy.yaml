@@ -6,19 +6,20 @@ rules:
   - level: RequestResponse
     resources:
       - group: "rtgroup.critical.com"
-        resources: ["rtresources"]
+        resources: ["rtresources", "rtresources/status"]
     namespaces: ["default"]
 
   - level: RequestResponse
     resources:
       - group: "apps"
-        resources: ["deployments"]
+        resources: ["deployments", "deployments/status"]
     namespaces: ["default"]
 
   - level: RequestResponse
     resources:
       - group: ""
-        resources: ["pods"]
+        resources: ["pods", "pods/status"]
     namespaces: ["default"]
+    verbs: ["create", "update", "patch", "delete"]
   
   - level: None
