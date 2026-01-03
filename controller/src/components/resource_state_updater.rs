@@ -87,19 +87,20 @@ pub extern "C" fn resource_state_updater(thread_data: *mut c_void) -> *mut c_voi
                                         new_status.replicas = Some(running_count);
 
                                         let mut new_conditions = new_status.conditions.unwrap_or_default();
+                                        let transition_time = chrono::Utc::now().to_rfc3339();
                                         if running_count == desired_replicas {
                                             for cond in &mut new_conditions {
                                                 if cond.condition_type == "Progressing" {
                                                     cond.status = "False".to_string();
                                                     cond.reason = Some("All desired replicas are running!".to_string());
                                                     cond.message = Some("All desired replicas are running!".to_string());
-                                                    cond.last_transition_time = Some(chrono::Utc::now().to_rfc3339());
+                                                    cond.last_transition_time = Some(transition_time.clone());
                                                 }
                                                 if cond.condition_type == "Ready" {
                                                     cond.status = "True".to_string();
                                                     cond.reason = Some("All desired replicas are running!".to_string());
                                                     cond.message = Some("All desired replicas are running!".to_string());
-                                                    cond.last_transition_time = Some(chrono::Utc::now().to_rfc3339());
+                                                    cond.last_transition_time = Some(transition_time.clone());
                                                 }
                                             }
                                         }

@@ -187,6 +187,7 @@ pub extern "C" fn watchdog(thread_data: *mut c_void) -> *mut c_void {
                         new_rtresource_status.desired_replicas = r.spec.replicas;
 
                         let mut new_rtresource_conditions =  new_rtresource_status.conditions.unwrap_or_default();
+                        let transition_time = chrono::Utc::now().to_rfc3339();
                         if new_rtresource_conditions.is_empty() {
                             
                             new_rtresource_conditions.push(Condition {
@@ -194,14 +195,14 @@ pub extern "C" fn watchdog(thread_data: *mut c_void) -> *mut c_void {
                                 status: "True".to_string(),
                                 reason: Some("RTResource created".to_string()),
                                 message: Some("RTResource is being processed".to_string()),
-                                last_transition_time: Some(chrono::Utc::now().to_rfc3339()),
+                                last_transition_time: Some(transition_time.clone()),
                             });
                             new_rtresource_conditions.push(Condition {
                                 condition_type: "Ready".to_string(),
                                 status: "False".to_string(),
                                 reason: Some("RTResource created".to_string()),
                                 message: Some("Waiting for pods to be ready".to_string()),
-                                last_transition_time: Some(chrono::Utc::now().to_rfc3339()),
+                                last_transition_time: Some(transition_time.clone()),
                             });
                         } else {
                             for cond in &mut new_rtresource_conditions {
@@ -209,13 +210,13 @@ pub extern "C" fn watchdog(thread_data: *mut c_void) -> *mut c_void {
                                     cond.status = "True".to_string();
                                     cond.reason = Some("RTResource Spec changed!".to_string());
                                     cond.message = Some("RTResource Spec changed!!".to_string());
-                                    cond.last_transition_time = Some(chrono::Utc::now().to_rfc3339());
+                                    cond.last_transition_time = Some(transition_time.clone());
                                 }
                                 if cond.condition_type == "Ready" {
                                     cond.status = "False".to_string();
                                     cond.reason = Some("RTResource Spec changed!!".to_string());
                                     cond.message = Some("RTResource Spec changed!!".to_string());
-                                    cond.last_transition_time = Some(chrono::Utc::now().to_rfc3339());
+                                    cond.last_transition_time = Some(transition_time.clone());
                                 }
                             }
                         }
