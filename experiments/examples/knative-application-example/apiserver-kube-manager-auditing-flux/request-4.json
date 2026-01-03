@@ -1,0 +1,946 @@
+{
+  "kind": "Event",
+  "apiVersion": "audit.k8s.io/v1",
+  "level": "RequestResponse",
+  "auditID": "ee310a04-4e9b-4927-bb04-ae8ea39cdf49",
+  "stage": "ResponseComplete",
+  "requestURI": "/api/v1/namespaces/default/pods/knative-critical-application-00001-deployment-648799748-ppfk7/status",
+  "verb": "patch",
+  "user": {
+    "username": "system:node:dessertw2",
+    "groups": [
+      "system:nodes",
+      "system:authenticated"
+    ]
+  },
+  "sourceIPs": [
+    "192.168.100.23"
+  ],
+  "userAgent": "kubelet/v1.29.0 (linux/amd64) kubernetes/3f7a50f",
+  "objectRef": {
+    "resource": "pods",
+    "namespace": "default",
+    "name": "knative-critical-application-00001-deployment-648799748-ppfk7",
+    "apiVersion": "v1",
+    "subresource": "status"
+  },
+  "responseStatus": {
+    "metadata": {},
+    "code": 200
+  },
+  "requestObject": {
+    "metadata": {
+      "uid": "5863ff49-fc90-452c-b53d-3d158b4b0f88"
+    },
+    "status": {
+      "$setElementOrder/conditions": [
+        {
+          "type": "PodReadyToStartContainers"
+        },
+        {
+          "type": "Initialized"
+        },
+        {
+          "type": "Ready"
+        },
+        {
+          "type": "ContainersReady"
+        },
+        {
+          "type": "PodScheduled"
+        }
+      ],
+      "conditions": [
+        {
+          "lastTransitionTime": "2026-01-03T22:03:22Z",
+          "message": null,
+          "reason": null,
+          "status": "True",
+          "type": "Ready"
+        },
+        {
+          "lastTransitionTime": "2026-01-03T22:03:22Z",
+          "message": null,
+          "reason": null,
+          "status": "True",
+          "type": "ContainersReady"
+        }
+      ],
+      "containerStatuses": [
+        {
+          "containerID": "containerd://0ba75979ab78704500d7ffffe0b0e3049f1a9899a2043e92138595077265309c",
+          "image": "sha256:058f4935d1cbc026f046e4c7f6ef3b1d778170ac61f293709a2fc89b1cff7009",
+          "imageID": "docker.io/library/nginx@sha256:c8dc101ba61a499398c245fed8123abc20a3867ebd3664087890a054a781770b",
+          "lastState": {},
+          "name": "knative-critical-container",
+          "ready": true,
+          "restartCount": 0,
+          "started": true,
+          "state": {
+            "running": {
+              "startedAt": "2026-01-03T22:03:20Z"
+            }
+          }
+        },
+        {
+          "containerID": "containerd://41a39b7bdf0e8ba38eb1414d2b658f0b68f7eb54dcffa91aaaa00b205395971e",
+          "image": "sha256:4a8338ff47c0694a918032c4fc15a643811affd681daa805d67ff6544296747c",
+          "imageID": "docker.io/dessertunina/knative-patch@sha256:952de51f6e19c15c20a58248a522f31b0df6a9e793838258e492a6ef95b11ae7",
+          "lastState": {},
+          "name": "queue-proxy",
+          "ready": true,
+          "restartCount": 0,
+          "started": true,
+          "state": {
+            "running": {
+              "startedAt": "2026-01-03T22:03:21Z"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "responseObject": {
+    "kind": "Pod",
+    "apiVersion": "v1",
+    "metadata": {
+      "name": "knative-critical-application-00001-deployment-648799748-ppfk7",
+      "generateName": "knative-critical-application-00001-deployment-648799748-",
+      "namespace": "default",
+      "uid": "5863ff49-fc90-452c-b53d-3d158b4b0f88",
+      "resourceVersion": "51222319",
+      "creationTimestamp": "2026-01-03T22:03:21Z",
+      "labels": {
+        "app": "knative-critical-application-00001",
+        "pod-template-hash": "648799748",
+        "serving.knative.dev/configuration": "knative-critical-application",
+        "serving.knative.dev/configurationGeneration": "1",
+        "serving.knative.dev/configurationUID": "2bcef62a-dccc-4e10-9a8c-8066da15015a",
+        "serving.knative.dev/revision": "knative-critical-application-00001",
+        "serving.knative.dev/revisionUID": "4a9d157b-29bb-4e4d-b597-67da5ca9c82c",
+        "serving.knative.dev/service": "knative-critical-application",
+        "serving.knative.dev/serviceUID": "f0d58da3-6d32-4354-afb2-8e456a9381b9"
+      },
+      "annotations": {
+        "kubectl.kubernetes.io/default-container": "knative-critical-container",
+        "serving.knative.dev/creator": "kubernetes-admin"
+      },
+      "ownerReferences": [
+        {
+          "apiVersion": "apps/v1",
+          "kind": "ReplicaSet",
+          "name": "knative-critical-application-00001-deployment-648799748",
+          "uid": "3e1bb48f-ecb3-4762-ad3d-62326e11b366",
+          "controller": true,
+          "blockOwnerDeletion": true
+        }
+      ],
+      "managedFields": [
+        {
+          "manager": "kube-controller-manager",
+          "operation": "Update",
+          "apiVersion": "v1",
+          "time": "2026-01-03T22:03:21Z",
+          "fieldsType": "FieldsV1",
+          "fieldsV1": {
+            "f:metadata": {
+              "f:annotations": {
+                ".": {},
+                "f:kubectl.kubernetes.io/default-container": {},
+                "f:serving.knative.dev/creator": {}
+              },
+              "f:generateName": {},
+              "f:labels": {
+                ".": {},
+                "f:app": {},
+                "f:pod-template-hash": {},
+                "f:serving.knative.dev/configuration": {},
+                "f:serving.knative.dev/configurationGeneration": {},
+                "f:serving.knative.dev/configurationUID": {},
+                "f:serving.knative.dev/revision": {},
+                "f:serving.knative.dev/revisionUID": {},
+                "f:serving.knative.dev/service": {},
+                "f:serving.knative.dev/serviceUID": {}
+              },
+              "f:ownerReferences": {
+                ".": {},
+                "k:{\"uid\":\"3e1bb48f-ecb3-4762-ad3d-62326e11b366\"}": {}
+              }
+            },
+            "f:spec": {
+              "f:affinity": {
+                ".": {},
+                "f:podAntiAffinity": {
+                  ".": {},
+                  "f:preferredDuringSchedulingIgnoredDuringExecution": {}
+                }
+              },
+              "f:containers": {
+                "k:{\"name\":\"knative-critical-container\"}": {
+                  ".": {},
+                  "f:env": {
+                    ".": {},
+                    "k:{\"name\":\"K_CONFIGURATION\"}": {
+                      ".": {},
+                      "f:name": {},
+                      "f:value": {}
+                    },
+                    "k:{\"name\":\"K_REVISION\"}": {
+                      ".": {},
+                      "f:name": {},
+                      "f:value": {}
+                    },
+                    "k:{\"name\":\"K_SERVICE\"}": {
+                      ".": {},
+                      "f:name": {},
+                      "f:value": {}
+                    },
+                    "k:{\"name\":\"PORT\"}": {
+                      ".": {},
+                      "f:name": {},
+                      "f:value": {}
+                    }
+                  },
+                  "f:image": {},
+                  "f:imagePullPolicy": {},
+                  "f:lifecycle": {
+                    ".": {},
+                    "f:preStop": {
+                      ".": {},
+                      "f:httpGet": {
+                        ".": {},
+                        "f:path": {},
+                        "f:port": {},
+                        "f:scheme": {}
+                      }
+                    }
+                  },
+                  "f:name": {},
+                  "f:ports": {
+                    ".": {},
+                    "k:{\"containerPort\":80,\"protocol\":\"TCP\"}": {
+                      ".": {},
+                      "f:containerPort": {},
+                      "f:name": {},
+                      "f:protocol": {}
+                    }
+                  },
+                  "f:resources": {
+                    ".": {},
+                    "f:limits": {
+                      ".": {},
+                      "f:cpu": {},
+                      "f:memory": {}
+                    },
+                    "f:requests": {
+                      ".": {},
+                      "f:cpu": {},
+                      "f:memory": {}
+                    }
+                  },
+                  "f:terminationMessagePath": {},
+                  "f:terminationMessagePolicy": {}
+                },
+                "k:{\"name\":\"queue-proxy\"}": {
+                  ".": {},
+                  "f:env": {
+                    ".": {},
+                    "k:{\"name\":\"CONTAINER_CONCURRENCY\"}": {
+                      ".": {},
+                      "f:name": {},
+                      "f:value": {}
+                    },
+                    "k:{\"name\":\"ENABLE_HTTP2_AUTO_DETECTION\"}": {
+                      ".": {},
+                      "f:name": {},
+                      "f:value": {}
+                    },
+                    "k:{\"name\":\"ENABLE_HTTP_FULL_DUPLEX\"}": {
+                      ".": {},
+                      "f:name": {},
+                      "f:value": {}
+                    },
+                    "k:{\"name\":\"ENABLE_MULTI_CONTAINER_PROBES\"}": {
+                      ".": {},
+                      "f:name": {},
+                      "f:value": {}
+                    },
+                    "k:{\"name\":\"HOST_IP\"}": {
+                      ".": {},
+                      "f:name": {},
+                      "f:valueFrom": {
+                        ".": {},
+                        "f:fieldRef": {}
+                      }
+                    },
+                    "k:{\"name\":\"OBSERVABILITY_CONFIG\"}": {
+                      ".": {},
+                      "f:name": {},
+                      "f:value": {}
+                    },
+                    "k:{\"name\":\"QUEUE_SERVING_PORT\"}": {
+                      ".": {},
+                      "f:name": {},
+                      "f:value": {}
+                    },
+                    "k:{\"name\":\"QUEUE_SERVING_TLS_PORT\"}": {
+                      ".": {},
+                      "f:name": {},
+                      "f:value": {}
+                    },
+                    "k:{\"name\":\"REVISION_IDLE_TIMEOUT_SECONDS\"}": {
+                      ".": {},
+                      "f:name": {},
+                      "f:value": {}
+                    },
+                    "k:{\"name\":\"REVISION_RESPONSE_START_TIMEOUT_SECONDS\"}": {
+                      ".": {},
+                      "f:name": {},
+                      "f:value": {}
+                    },
+                    "k:{\"name\":\"REVISION_TIMEOUT_SECONDS\"}": {
+                      ".": {},
+                      "f:name": {},
+                      "f:value": {}
+                    },
+                    "k:{\"name\":\"ROOT_CA\"}": {
+                      ".": {},
+                      "f:name": {}
+                    },
+                    "k:{\"name\":\"SERVING_CONFIGURATION\"}": {
+                      ".": {},
+                      "f:name": {},
+                      "f:value": {}
+                    },
+                    "k:{\"name\":\"SERVING_LOGGING_CONFIG\"}": {
+                      ".": {},
+                      "f:name": {}
+                    },
+                    "k:{\"name\":\"SERVING_LOGGING_LEVEL\"}": {
+                      ".": {},
+                      "f:name": {}
+                    },
+                    "k:{\"name\":\"SERVING_NAMESPACE\"}": {
+                      ".": {},
+                      "f:name": {},
+                      "f:value": {}
+                    },
+                    "k:{\"name\":\"SERVING_POD\"}": {
+                      ".": {},
+                      "f:name": {},
+                      "f:valueFrom": {
+                        ".": {},
+                        "f:fieldRef": {}
+                      }
+                    },
+                    "k:{\"name\":\"SERVING_POD_IP\"}": {
+                      ".": {},
+                      "f:name": {},
+                      "f:valueFrom": {
+                        ".": {},
+                        "f:fieldRef": {}
+                      }
+                    },
+                    "k:{\"name\":\"SERVING_READINESS_PROBE\"}": {
+                      ".": {},
+                      "f:name": {},
+                      "f:value": {}
+                    },
+                    "k:{\"name\":\"SERVING_REVISION\"}": {
+                      ".": {},
+                      "f:name": {},
+                      "f:value": {}
+                    },
+                    "k:{\"name\":\"SERVING_SERVICE\"}": {
+                      ".": {},
+                      "f:name": {},
+                      "f:value": {}
+                    },
+                    "k:{\"name\":\"SYSTEM_NAMESPACE\"}": {
+                      ".": {},
+                      "f:name": {},
+                      "f:value": {}
+                    },
+                    "k:{\"name\":\"USER_PORT\"}": {
+                      ".": {},
+                      "f:name": {},
+                      "f:value": {}
+                    }
+                  },
+                  "f:image": {},
+                  "f:imagePullPolicy": {},
+                  "f:name": {},
+                  "f:ports": {
+                    ".": {},
+                    "k:{\"containerPort\":8012,\"protocol\":\"TCP\"}": {
+                      ".": {},
+                      "f:containerPort": {},
+                      "f:name": {},
+                      "f:protocol": {}
+                    },
+                    "k:{\"containerPort\":8022,\"protocol\":\"TCP\"}": {
+                      ".": {},
+                      "f:containerPort": {},
+                      "f:name": {},
+                      "f:protocol": {}
+                    },
+                    "k:{\"containerPort\":8112,\"protocol\":\"TCP\"}": {
+                      ".": {},
+                      "f:containerPort": {},
+                      "f:name": {},
+                      "f:protocol": {}
+                    },
+                    "k:{\"containerPort\":9090,\"protocol\":\"TCP\"}": {
+                      ".": {},
+                      "f:containerPort": {},
+                      "f:name": {},
+                      "f:protocol": {}
+                    },
+                    "k:{\"containerPort\":9091,\"protocol\":\"TCP\"}": {
+                      ".": {},
+                      "f:containerPort": {},
+                      "f:name": {},
+                      "f:protocol": {}
+                    }
+                  },
+                  "f:readinessProbe": {
+                    ".": {},
+                    "f:failureThreshold": {},
+                    "f:httpGet": {
+                      ".": {},
+                      "f:httpHeaders": {},
+                      "f:path": {},
+                      "f:port": {},
+                      "f:scheme": {}
+                    },
+                    "f:periodSeconds": {},
+                    "f:successThreshold": {},
+                    "f:timeoutSeconds": {}
+                  },
+                  "f:resources": {
+                    ".": {},
+                    "f:requests": {
+                      ".": {},
+                      "f:cpu": {}
+                    }
+                  },
+                  "f:securityContext": {
+                    ".": {},
+                    "f:allowPrivilegeEscalation": {},
+                    "f:capabilities": {
+                      ".": {},
+                      "f:drop": {}
+                    },
+                    "f:readOnlyRootFilesystem": {},
+                    "f:runAsNonRoot": {},
+                    "f:seccompProfile": {
+                      ".": {},
+                      "f:type": {}
+                    }
+                  },
+                  "f:terminationMessagePath": {},
+                  "f:terminationMessagePolicy": {}
+                }
+              },
+              "f:dnsPolicy": {},
+              "f:enableServiceLinks": {},
+              "f:restartPolicy": {},
+              "f:schedulerName": {},
+              "f:securityContext": {},
+              "f:terminationGracePeriodSeconds": {}
+            }
+          }
+        },
+        {
+          "manager": "kubelet",
+          "operation": "Update",
+          "apiVersion": "v1",
+          "time": "2026-01-03T22:03:22Z",
+          "fieldsType": "FieldsV1",
+          "fieldsV1": {
+            "f:status": {
+              "f:conditions": {
+                "k:{\"type\":\"ContainersReady\"}": {
+                  ".": {},
+                  "f:lastProbeTime": {},
+                  "f:lastTransitionTime": {},
+                  "f:status": {},
+                  "f:type": {}
+                },
+                "k:{\"type\":\"Initialized\"}": {
+                  ".": {},
+                  "f:lastProbeTime": {},
+                  "f:lastTransitionTime": {},
+                  "f:status": {},
+                  "f:type": {}
+                },
+                "k:{\"type\":\"PodReadyToStartContainers\"}": {
+                  ".": {},
+                  "f:lastProbeTime": {},
+                  "f:lastTransitionTime": {},
+                  "f:status": {},
+                  "f:type": {}
+                },
+                "k:{\"type\":\"Ready\"}": {
+                  ".": {},
+                  "f:lastProbeTime": {},
+                  "f:lastTransitionTime": {},
+                  "f:status": {},
+                  "f:type": {}
+                }
+              },
+              "f:containerStatuses": {},
+              "f:hostIP": {},
+              "f:hostIPs": {},
+              "f:phase": {},
+              "f:podIP": {},
+              "f:podIPs": {
+                ".": {},
+                "k:{\"ip\":\"10.244.7.196\"}": {
+                  ".": {},
+                  "f:ip": {}
+                }
+              },
+              "f:startTime": {}
+            }
+          },
+          "subresource": "status"
+        }
+      ]
+    },
+    "spec": {
+      "volumes": [
+        {
+          "name": "kube-api-access-vcp6w",
+          "projected": {
+            "sources": [
+              {
+                "serviceAccountToken": {
+                  "expirationSeconds": 3607,
+                  "path": "token"
+                }
+              },
+              {
+                "configMap": {
+                  "name": "kube-root-ca.crt",
+                  "items": [
+                    {
+                      "key": "ca.crt",
+                      "path": "ca.crt"
+                    }
+                  ]
+                }
+              },
+              {
+                "downwardAPI": {
+                  "items": [
+                    {
+                      "path": "namespace",
+                      "fieldRef": {
+                        "apiVersion": "v1",
+                        "fieldPath": "metadata.namespace"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "defaultMode": 420
+          }
+        }
+      ],
+      "containers": [
+        {
+          "name": "knative-critical-container",
+          "image": "index.docker.io/library/nginx@sha256:ca871a86d45a3ec6864dc45f014b11fe626145569ef0e74deaffc95a3b15b430",
+          "ports": [
+            {
+              "name": "user-port",
+              "containerPort": 80,
+              "protocol": "TCP"
+            }
+          ],
+          "env": [
+            {
+              "name": "PORT",
+              "value": "80"
+            },
+            {
+              "name": "K_REVISION",
+              "value": "knative-critical-application-00001"
+            },
+            {
+              "name": "K_CONFIGURATION",
+              "value": "knative-critical-application"
+            },
+            {
+              "name": "K_SERVICE",
+              "value": "knative-critical-application"
+            }
+          ],
+          "resources": {
+            "limits": {
+              "cpu": "700m",
+              "memory": "200Mi"
+            },
+            "requests": {
+              "cpu": "700m",
+              "memory": "200Mi"
+            }
+          },
+          "volumeMounts": [
+            {
+              "name": "kube-api-access-vcp6w",
+              "readOnly": true,
+              "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount"
+            }
+          ],
+          "lifecycle": {
+            "preStop": {
+              "httpGet": {
+                "path": "/wait-for-drain",
+                "port": 8022,
+                "scheme": "HTTP"
+              }
+            }
+          },
+          "terminationMessagePath": "/dev/termination-log",
+          "terminationMessagePolicy": "FallbackToLogsOnError",
+          "imagePullPolicy": "IfNotPresent"
+        },
+        {
+          "name": "queue-proxy",
+          "image": "docker.io/dessertunina/knative-patch@sha256:952de51f6e19c15c20a58248a522f31b0df6a9e793838258e492a6ef95b11ae7",
+          "ports": [
+            {
+              "name": "http-queueadm",
+              "containerPort": 8022,
+              "protocol": "TCP"
+            },
+            {
+              "name": "http-autometric",
+              "containerPort": 9090,
+              "protocol": "TCP"
+            },
+            {
+              "name": "http-usermetric",
+              "containerPort": 9091,
+              "protocol": "TCP"
+            },
+            {
+              "name": "queue-port",
+              "containerPort": 8012,
+              "protocol": "TCP"
+            },
+            {
+              "name": "https-port",
+              "containerPort": 8112,
+              "protocol": "TCP"
+            }
+          ],
+          "env": [
+            {
+              "name": "SERVING_NAMESPACE",
+              "value": "default"
+            },
+            {
+              "name": "SERVING_SERVICE",
+              "value": "knative-critical-application"
+            },
+            {
+              "name": "SERVING_CONFIGURATION",
+              "value": "knative-critical-application"
+            },
+            {
+              "name": "SERVING_REVISION",
+              "value": "knative-critical-application-00001"
+            },
+            {
+              "name": "QUEUE_SERVING_PORT",
+              "value": "8012"
+            },
+            {
+              "name": "QUEUE_SERVING_TLS_PORT",
+              "value": "8112"
+            },
+            {
+              "name": "CONTAINER_CONCURRENCY",
+              "value": "0"
+            },
+            {
+              "name": "REVISION_TIMEOUT_SECONDS",
+              "value": "300"
+            },
+            {
+              "name": "REVISION_RESPONSE_START_TIMEOUT_SECONDS",
+              "value": "0"
+            },
+            {
+              "name": "REVISION_IDLE_TIMEOUT_SECONDS",
+              "value": "0"
+            },
+            {
+              "name": "SERVING_POD",
+              "valueFrom": {
+                "fieldRef": {
+                  "apiVersion": "v1",
+                  "fieldPath": "metadata.name"
+                }
+              }
+            },
+            {
+              "name": "SERVING_POD_IP",
+              "valueFrom": {
+                "fieldRef": {
+                  "apiVersion": "v1",
+                  "fieldPath": "status.podIP"
+                }
+              }
+            },
+            {
+              "name": "SERVING_LOGGING_CONFIG"
+            },
+            {
+              "name": "SERVING_LOGGING_LEVEL"
+            },
+            {
+              "name": "USER_PORT",
+              "value": "80"
+            },
+            {
+              "name": "SYSTEM_NAMESPACE",
+              "value": "knative-serving"
+            },
+            {
+              "name": "SERVING_READINESS_PROBE",
+              "value": {
+                "tcpSocket": {
+                  "port": 80,
+                  "host": "127.0.0.1"
+                },
+                "successThreshold": 1
+              }
+            },
+            {
+              "name": "HOST_IP",
+              "valueFrom": {
+                "fieldRef": {
+                  "apiVersion": "v1",
+                  "fieldPath": "status.hostIP"
+                }
+              }
+            },
+            {
+              "name": "ENABLE_HTTP2_AUTO_DETECTION",
+              "value": "false"
+            },
+            {
+              "name": "ENABLE_HTTP_FULL_DUPLEX",
+              "value": "false"
+            },
+            {
+              "name": "ROOT_CA"
+            },
+            {
+              "name": "ENABLE_MULTI_CONTAINER_PROBES",
+              "value": "false"
+            },
+            {
+              "name": "OBSERVABILITY_CONFIG",
+              "value": {
+                "tracing": {
+                  "protocol": "none"
+                },
+                "metrics": {
+                  "protocol": "none"
+                },
+                "runtime": {
+                  "profiling": "disabled",
+                  "exportInterval": 15000000000
+                },
+                "requestMetrics": {
+                  "protocol": "none"
+                },
+                "requestLogTemplate": "{\"httpRequest\": {\"requestMethod\": \"{{.Request.Method}}\", \"requestUrl\": \"{{js .Request.RequestURI}}\", \"requestSize\": \"{{.Request.ContentLength}}\", \"status\": {{.Response.Code}}, \"responseSize\": \"{{.Response.Size}}\", \"userAgent\": \"{{js .Request.UserAgent}}\", \"remoteIp\": \"{{js .Request.RemoteAddr}}\", \"serverIp\": \"{{.Revision.PodIP}}\", \"referer\": \"{{js .Request.Referer}}\", \"latency\": \"{{.Response.Latency}}s\", \"protocol\": \"{{.Request.Proto}}\"}, \"traceId\": \"{{index .Request.Header \"X-B3-Traceid\"}}\"}"
+              }
+            }
+          ],
+          "resources": {
+            "requests": {
+              "cpu": "25m"
+            }
+          },
+          "volumeMounts": [
+            {
+              "name": "kube-api-access-vcp6w",
+              "readOnly": true,
+              "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount"
+            }
+          ],
+          "readinessProbe": {
+            "httpGet": {
+              "path": "/",
+              "port": 8012,
+              "scheme": "HTTP",
+              "httpHeaders": [
+                {
+                  "name": "K-Network-Probe",
+                  "value": "queue"
+                }
+              ]
+            },
+            "timeoutSeconds": 1,
+            "periodSeconds": 10,
+            "successThreshold": 1,
+            "failureThreshold": 3
+          },
+          "terminationMessagePath": "/dev/termination-log",
+          "terminationMessagePolicy": "File",
+          "imagePullPolicy": "IfNotPresent",
+          "securityContext": {
+            "capabilities": {
+              "drop": [
+                "ALL"
+              ]
+            },
+            "runAsNonRoot": true,
+            "readOnlyRootFilesystem": true,
+            "allowPrivilegeEscalation": false,
+            "seccompProfile": {
+              "type": "RuntimeDefault"
+            }
+          }
+        }
+      ],
+      "restartPolicy": "Always",
+      "terminationGracePeriodSeconds": 300,
+      "dnsPolicy": "ClusterFirst",
+      "serviceAccountName": "default",
+      "serviceAccount": "default",
+      "nodeName": "dessertw2",
+      "securityContext": {},
+      "affinity": {
+        "podAntiAffinity": {
+          "preferredDuringSchedulingIgnoredDuringExecution": [
+            {
+              "weight": 100,
+              "podAffinityTerm": {
+                "labelSelector": {
+                  "matchLabels": {
+                    "serving.knative.dev/revision": "knative-critical-application-00001"
+                  }
+                },
+                "topologyKey": "kubernetes.io/hostname"
+              }
+            }
+          ]
+        }
+      },
+      "schedulerName": "default-scheduler",
+      "tolerations": [
+        {
+          "key": "node.kubernetes.io/not-ready",
+          "operator": "Exists",
+          "effect": "NoExecute",
+          "tolerationSeconds": 300
+        },
+        {
+          "key": "node.kubernetes.io/unreachable",
+          "operator": "Exists",
+          "effect": "NoExecute",
+          "tolerationSeconds": 300
+        }
+      ],
+      "priority": 0,
+      "enableServiceLinks": false,
+      "preemptionPolicy": "PreemptLowerPriority"
+    },
+    "status": {
+      "phase": "Running",
+      "conditions": [
+        {
+          "type": "PodReadyToStartContainers",
+          "status": "True",
+          "lastProbeTime": null,
+          "lastTransitionTime": "2026-01-03T22:03:22Z"
+        },
+        {
+          "type": "Initialized",
+          "status": "True",
+          "lastProbeTime": null,
+          "lastTransitionTime": "2026-01-03T22:03:20Z"
+        },
+        {
+          "type": "Ready",
+          "status": "True",
+          "lastProbeTime": null,
+          "lastTransitionTime": "2026-01-03T22:03:22Z"
+        },
+        {
+          "type": "ContainersReady",
+          "status": "True",
+          "lastProbeTime": null,
+          "lastTransitionTime": "2026-01-03T22:03:22Z"
+        },
+        {
+          "type": "PodScheduled",
+          "status": "True",
+          "lastProbeTime": null,
+          "lastTransitionTime": "2026-01-03T22:03:21Z"
+        }
+      ],
+      "hostIP": "192.168.100.23",
+      "hostIPs": [
+        {
+          "ip": "192.168.100.23"
+        }
+      ],
+      "podIP": "10.244.7.196",
+      "podIPs": [
+        {
+          "ip": "10.244.7.196"
+        }
+      ],
+      "startTime": "2026-01-03T22:03:20Z",
+      "containerStatuses": [
+        {
+          "name": "knative-critical-container",
+          "state": {
+            "running": {
+              "startedAt": "2026-01-03T22:03:20Z"
+            }
+          },
+          "lastState": {},
+          "ready": true,
+          "restartCount": 0,
+          "image": "sha256:058f4935d1cbc026f046e4c7f6ef3b1d778170ac61f293709a2fc89b1cff7009",
+          "imageID": "docker.io/library/nginx@sha256:c8dc101ba61a499398c245fed8123abc20a3867ebd3664087890a054a781770b",
+          "containerID": "containerd://0ba75979ab78704500d7ffffe0b0e3049f1a9899a2043e92138595077265309c",
+          "started": true
+        },
+        {
+          "name": "queue-proxy",
+          "state": {
+            "running": {
+              "startedAt": "2026-01-03T22:03:21Z"
+            }
+          },
+          "lastState": {},
+          "ready": true,
+          "restartCount": 0,
+          "image": "sha256:4a8338ff47c0694a918032c4fc15a643811affd681daa805d67ff6544296747c",
+          "imageID": "docker.io/dessertunina/knative-patch@sha256:952de51f6e19c15c20a58248a522f31b0df6a9e793838258e492a6ef95b11ae7",
+          "containerID": "containerd://41a39b7bdf0e8ba38eb1414d2b658f0b68f7eb54dcffa91aaaa00b205395971e",
+          "started": true
+        }
+      ],
+      "qosClass": "Burstable"
+    }
+  },
+  "requestReceivedTimestamp": "2026-01-03T22:03:22.804153Z",
+  "stageTimestamp": "2026-01-03T22:03:22.839673Z",
+  "annotations": {
+    "authorization.k8s.io/decision": "allow",
+    "authorization.k8s.io/reason": ""
+  }
+}
