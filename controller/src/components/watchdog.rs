@@ -21,7 +21,6 @@ use libc::{
     O_RDONLY,
     mq_attr,
     mq_open,
-    mq_unlink,
     mq_close,
     mq_receive,
     pthread_cond_signal,
@@ -357,7 +356,6 @@ pub extern "C" fn watchdog(thread_data: *mut c_void) -> *mut c_void {
         Cleanup phase.
         */
     	mq_close(queue_des);
-        mq_unlink(shared_state.queue.as_ptr());
     }
     
     println!("Watchdog - Too many Watchdogs! Terminating...");
