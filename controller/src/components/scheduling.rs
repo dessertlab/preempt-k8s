@@ -20,7 +20,7 @@ use kube::{
     }
 };
 use k8s_openapi::api::core::v1::Pod;
-use rand::Rng;
+// use rand::Rng; // For the random scheduler (currently not used)
 
 use crate::utils::rtresource::RTResource;
 
@@ -108,10 +108,10 @@ pub async fn create_pod(thread_name: String, client: Client, rtresource: &RTReso
         ..Default::default()
     };
 
-    let scheduled_pod = scheduler(thread_name.clone(), pod);
+    // let scheduled_pod = scheduler(thread_name.clone(), pod);
 
     let pp = PostParams::default();
-    match pod_api.create(&pp, &scheduled_pod).await {
+    match pod_api.create(&pp, &pod).await { // Use scheduled_pod when scheduler function is used
         Ok(o) => println!("{} - Pod created: {}!", thread_name, o.metadata.name.as_ref().unwrap()),
         Err(e) => println!("{} - An error occurred while creating the Pod: {}!", thread_name, e),
     }
@@ -138,6 +138,7 @@ This function schedules a Pod on a node.
 
 WARNING: at the moment, we only chose a random node frome those available.
 */
+/*
 fn scheduler(thread_name: String, mut pod: Pod) -> Pod {
     // TODO: take node list from apiserver
     let random_number = rand::thread_rng().gen_range(1..=3);
@@ -157,3 +158,4 @@ fn scheduler(thread_name: String, mut pod: Pod) -> Pod {
 
     pod
 }
+*/
