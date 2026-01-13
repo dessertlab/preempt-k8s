@@ -33,10 +33,13 @@ config:
     jaeger: null
     prometheus: null
     zipkin: null
+    # Collects logs from Kubernetes audit log file
     filelog:
       include:
         - /var/log/kubernetes/audit/audit.log
       start_at: end
+      # Parses each line as a JSON object
+      # using "requestReceivedTimestamp" as the log timestamp
       operators:
         - type: json_parser
           timestamp:
@@ -44,23 +47,27 @@ config:
             layout: '%Y-%m-%dT%H:%M:%S.%fZ'
   
   processors:
+    # Batches logs and traces for efficient transmission
     batch:
       timeout: 10s
       send_batch_size: 100
       send_batch_max_size: 200
     
     resource:
+      # Labels the collected logs as "kubernetes-audit"
       attributes:
         - key: job
           value: "kubernetes-audit"
           action: insert
   
   exporters:
+    # Loki endpoint for logs
     otlphttp:
       endpoint: http://10.244.1.55:3100/otlp
       tls:
         insecure: true
 
+    # Zipkin endpoint for logs
     zipkin:
       endpoint: http://zipkin.observability.svc.cluster.local:9411/api/v2/spans
       format: json
