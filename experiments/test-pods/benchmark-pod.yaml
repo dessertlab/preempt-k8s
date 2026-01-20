@@ -9,7 +9,7 @@ spec:
     runAsGroup: 0
   containers:
     - name: benchmark-container
-      image: alpine:latest
+      image: debian:latest
       command: ["tail", "-f", "/dev/null"]
       resources:
         requests:
