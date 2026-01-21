@@ -244,13 +244,16 @@ if [[ "$TEST_TYPE" == "Deployment" ]]; then
             
             echo "  Creating deployment: $DEPLOYMENT_NAME"
             
-            if generate_deployment "$DEPLOYMENT_NAME"; then
-                CREATED_DEPLOYMENTS+=("$DEPLOYMENT_NAME")
-                echo "    ✓ Deployment created successfully"
-            else
-                echo "    ✗ Failed to create deployment" >&2
-            fi
+            (
+                if generate_deployment "$DEPLOYMENT_NAME"; then
+                    echo "    ✓ Deployment created successfully: $DEPLOYMENT_NAME"
+                else
+                    echo "    ✗ Failed to create deployment: $DEPLOYMENT_NAME" >&2
+                fi
+            ) &
+            CREATED_DEPLOYMENTS+=("$DEPLOYMENT_NAME")
         done
+        wait
         
         # Small delay between control plane interfering bursts to avoid overwhelming the API server
         sleep 1
@@ -261,12 +264,15 @@ if [[ "$TEST_TYPE" == "Deployment" ]]; then
 
             echo "  Deleting deployment: $DEPLOYMENT_NAME"
 
-            if remove_deployment "$DEPLOYMENT_NAME"; then
-                echo "    ✓ Deployment deleted successfully"
-            else
-                echo "    ✗ Failed to delete deployment" >&2
-            fi
+            (
+                if remove_deployment "$DEPLOYMENT_NAME"; then
+                    echo "    ✓ Deployment deleted successfully: $DEPLOYMENT_NAME"
+                else
+                    echo "    ✗ Failed to delete deployment: $DEPLOYMENT_NAME" >&2
+                fi
+            ) &
         done
+        wait
         
         # Clear the array after deletion since we've removed all deployments
         CREATED_DEPLOYMENTS=()
@@ -293,13 +299,16 @@ elif [[ "$TEST_TYPE" == "RTResource" ]]; then
             
             echo "  Creating rtresource: $RTRESOURCE_NAME"
             
-            if generate_rtresource "$RTRESOURCE_NAME"; then
-                CREATED_RTRESOURCES+=("$RTRESOURCE_NAME")
-                echo "    ✓ Rtresource created successfully"
-            else
-                echo "    ✗ Failed to create rtresource" >&2
-            fi
+            (
+                if generate_rtresource "$RTRESOURCE_NAME"; then
+                    echo "    ✓ Rtresource created successfully: $RTRESOURCE_NAME"
+                else
+                    echo "    ✗ Failed to create rtresource: $RTRESOURCE_NAME" >&2
+                fi
+            ) &
+            CREATED_RTRESOURCES+=("$RTRESOURCE_NAME")
         done
+        wait
         
         # Small delay between control plane interfering bursts to avoid overwhelming the API server
         sleep 1
@@ -310,12 +319,15 @@ elif [[ "$TEST_TYPE" == "RTResource" ]]; then
 
             echo "  Deleting rtresource: $RTRESOURCE_NAME"
 
-            if remove_rtresource "$RTRESOURCE_NAME"; then
-                echo "    ✓ Rtresource deleted successfully"
-            else
-                echo "    ✗ Failed to delete rtresource" >&2
-            fi
+            (
+                if remove_rtresource "$RTRESOURCE_NAME"; then
+                    echo "    ✓ Rtresource deleted successfully: $RTRESOURCE_NAME"
+                else
+                    echo "    ✗ Failed to delete rtresource: $RTRESOURCE_NAME" >&2
+                fi
+            ) &
         done
+        wait
         
         # Clear the array after deletion since we've removed all rtresources
         CREATED_RTRESOURCES=()
