@@ -58,6 +58,7 @@ if ! [[ "$CRITICALITY_LEVEL" =~ ^[0-9]+$ ]] || [[ "$CRITICALITY_LEVEL" -lt 1 ]];
     exit 1
 fi
 
+# Display configuration
 echo "================================================"
 echo "Interfering Load - Starting"
 echo "================================================"
@@ -256,7 +257,7 @@ if [[ "$TEST_TYPE" == "Deployment" ]]; then
         wait
         
         # Small delay between control plane interfering bursts to avoid overwhelming the API server
-        sleep 1
+        sleep 0.1
 
         echo "Generating ${DEPLOYMENT_BATCH}th deletion burst with $NUMBER_OF_INTERFERING_RESOURCES deployment(s)..."
         for i in $(seq 1 "$NUMBER_OF_INTERFERING_RESOURCES"); do
@@ -278,7 +279,7 @@ if [[ "$TEST_TYPE" == "Deployment" ]]; then
         CREATED_DEPLOYMENTS=()
 
         # Small delay between control plane interfering bursts to avoid overwhelming the API server
-        sleep 1
+        sleep 0.1
     done
     
 elif [[ "$TEST_TYPE" == "RTResource" ]]; then
@@ -311,7 +312,7 @@ elif [[ "$TEST_TYPE" == "RTResource" ]]; then
         wait
         
         # Small delay between control plane interfering bursts to avoid overwhelming the API server
-        sleep 1
+        sleep 0.1
 
         echo "Generating ${RTRESOURCE_BATCH}th deletion burst with $NUMBER_OF_INTERFERING_RESOURCES rtresource(s)..."
         for i in $(seq 1 "$NUMBER_OF_INTERFERING_RESOURCES"); do
@@ -333,7 +334,7 @@ elif [[ "$TEST_TYPE" == "RTResource" ]]; then
         CREATED_RTRESOURCES=()
 
         # Small delay between control plane interfering bursts to avoid overwhelming the API server
-        sleep 1
+        sleep 0.1
     done
     
 fi
