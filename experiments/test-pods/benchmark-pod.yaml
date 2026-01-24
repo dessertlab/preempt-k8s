@@ -4,6 +4,8 @@ metadata:
   name: benchmark-pod
   namespace: default
 spec:
+  nodeSelector:
+    kubernetes.io/hostname: dessertw4
   securityContext:
     runAsUser: 0
     runAsGroup: 0
