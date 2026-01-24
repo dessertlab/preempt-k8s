@@ -41,7 +41,7 @@ spec:
                   - key: kubernetes.io/hostname
                     operator: NotIn
                     values:
-                      - dessert-w3
+                      - dessertw3
       containers:
         - image: docker.io/vhiveease/relay:latest
           imagePullPolicy: Never
