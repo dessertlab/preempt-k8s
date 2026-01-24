@@ -42,6 +42,7 @@ spec:
                     operator: NotIn
                     values:
                       - dessertw3
+                      - dessertw4
       containers:
         - image: docker.io/vhiveease/relay:latest
           imagePullPolicy: Never
