@@ -11,7 +11,7 @@ set -o pipefail
 TEST_TYPE="Deployment"
 NUMBER_OF_INTERFERING_RESOURCES="1"
 CRITICALITY_LEVEL="2"
-BUCKET_NODE="dessert-w3"
+BUCKET_NODE="dessertw3"
 
 # Parse command line flags
 while getopts "t:i:c:n:h" opt; do
@@ -27,7 +27,7 @@ while getopts "t:i:c:n:h" opt; do
             echo "  -t <test-type>      Type of test to run (default: Deployment)"
             echo "  -i <number>         Number of interfering resources (default: 1)"
             echo "  -c <level>          Criticality level for RTResources, not used for Deployments (default: 2)"
-            echo "  -n <node-name>      Node to target for interference (default: dessert-w3)"
+            echo "  -n <node-name>      Node to target for interference (default: dessertw3)"
             echo "  -h                  Show this help message"
             exit 0
             ;;
