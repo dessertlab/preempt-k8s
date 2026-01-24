@@ -11,13 +11,15 @@ set -o pipefail
 TEST_TYPE="Deployment"
 NUMBER_OF_INTERFERING_RESOURCES="1"
 CRITICALITY_LEVEL="2"
+BUCKET_NODE="dessert-w3"
 
 # Parse command line flags
-while getopts "t:i:c:h" opt; do
+while getopts "t:i:c:n:h" opt; do
     case $opt in
         t) TEST_TYPE="$OPTARG" ;;
         i) NUMBER_OF_INTERFERING_RESOURCES="$OPTARG" ;;
         c) CRITICALITY_LEVEL="$OPTARG" ;;
+        n) BUCKET_NODE="$OPTARG" ;;
         h) 
             echo "Usage: $0 [-t <test-type>] [-i <number-of-interfering-resources>] [-c <criticality-level>] [-h]"
             echo ""
@@ -25,6 +27,7 @@ while getopts "t:i:c:h" opt; do
             echo "  -t <test-type>      Type of test to run (default: Deployment)"
             echo "  -i <number>         Number of interfering resources (default: 1)"
             echo "  -c <level>          Criticality level for RTResources, not used for Deployments (default: 2)"
+            echo "  -n <node-name>      Node to target for interference (default: dessert-w3)"
             echo "  -h                  Show this help message"
             exit 0
             ;;
@@ -58,6 +61,12 @@ if ! [[ "$CRITICALITY_LEVEL" =~ ^[0-9]+$ ]] || [[ "$CRITICALITY_LEVEL" -lt 1 ]];
     exit 1
 fi
 
+# Validate bucket node exists
+if ! kubectl get node "$BUCKET_NODE" &>/dev/null; then
+    echo "Error: Specified bucket node '$BUCKET_NODE' does not exist" >&2
+    exit 1
+fi
+
 # Display configuration
 echo "================================================"
 echo "Interfering Load - Starting"
@@ -67,6 +76,7 @@ echo "Number of Interfering Resources: $NUMBER_OF_INTERFERING_RESOURCES"
 if [[ "$TEST_TYPE" == "RTResource" ]]; then
     echo "Criticality Level: $CRITICALITY_LEVEL"
 fi
+echo "Bucket Node: $BUCKET_NODE"
 echo "================================================"
 echo ""
 
@@ -147,7 +157,7 @@ spec:
         app: $deployment_name
     spec:
       nodeSelector:
-        kubernetes.io/hostname: dessert-w3
+        kubernetes.io/hostname: $BUCKET_NODE
       containers:
       - name: interfering-container
         image: nginx:latest
@@ -199,7 +209,7 @@ spec:
         app-selector: $rtresource_name
     spec:
       nodeSelector:
-        kubernetes.io/hostname: dessert-w3
+        kubernetes.io/hostname: $BUCKET_NODE
       containers:
         - name: interfering-container
           image: nginx:latest
