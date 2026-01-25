@@ -365,7 +365,8 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deleting service..."
 kubectl delete -f "$SERVICE_MANIFEST" &>/dev/null
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for all rnn-serving-python pods to terminate..."
-while kubectl get pods --no-headers | { grep -q "^rnn-serving-python" || true; }; do
+while [ $(kubectl get pods --no-headers | { grep "^rnn-serving-python" || true; } | wc -l) -gt 0 ]; do
+    kubectl get pods --no-headers | { grep "^rnn-serving-python" || true; } | awk '{print $1}' | xargs -r kubectl delete pod --grace-period=0 --force 2>/dev/null 2>&1 || true
     sleep 2
 done
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Service terminated!"
