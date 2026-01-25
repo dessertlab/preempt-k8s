@@ -281,7 +281,12 @@ for i in $(seq 1 "$ITERATIONS"); do
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Stopping interference load..."
         if kill -0 $INTERFERENCE_PID 2>/dev/null; then
             kill $INTERFERENCE_PID
-            wait $INTERFERENCE_PID 2>/dev/null || true
+            for _ in {1..10}; do
+                if ! kill -0 $INTERFERENCE_PID 2>/dev/null; then
+                    break
+                fi
+                sleep 1
+            done
             sleep 2
         fi
     fi
