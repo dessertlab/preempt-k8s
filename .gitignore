@@ -2,4 +2,5 @@
 target
 
 # Experiments
+experiments/vSwarm-benchmarks/rnn-serving/scale-0-1/results
 experiments/vSwarm-benchmarks/rnn-serving/scale-1-2/results
