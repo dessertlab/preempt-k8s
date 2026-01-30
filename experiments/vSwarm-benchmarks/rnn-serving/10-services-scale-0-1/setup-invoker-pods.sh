@@ -121,65 +121,12 @@ done
 if [[ "$CREATE" == "true" ]]; then
     echo "Creating $NUMBER_OF_PODS invoker pods with base name '$POD_BASE_NAME'..."
 
+    # Create local Knative Service manifest files
     for i in $(seq 1 "$NUMBER_OF_PODS"); do
-        POD_NAME="${POD_BASE_NAME}-${i}"
+        MANIFEST_FILE="./kn-rnn-serving-python-${i}.yaml"
         SERVICE_NAME="${SERVICE_BASE_NAME}-${i}"
         NON_FEASIBLE_NODE_1="${LIST_OF_NON_FEASIBLE_NODES[0]}"
         NON_FEASIBLE_NODE_2="${LIST_OF_NON_FEASIBLE_NODES[1]}"
-
-        # Create the invoker pod
-        cat <<EOF | kubectl apply -f
-apiVersion: v1
-kind: Pod
-metadata:
-  name: $POD_NAME
-  namespace: default
-spec:
-  nodeSelector:
-    kubernetes.io/hostname: $BUCKET_NODE
-  securityContext:
-    runAsUser: 0
-    runAsGroup: 0
-  containers:
-    - name: benchmark-container
-      image: debian:latest
-      command: ["tail", "-f", "/dev/null"]
-      resources:
-        requests:
-          memory: "64Mi"
-          cpu: "250m"
-        limits:
-          memory: "128Mi"
-          cpu: "500m"
-      securityContext:
-        runAsUser: 0
-        runAsGroup: 0
-        allowPrivilegeEscalation: true
-        privileged: true
-        readOnlyRootFilesystem: false
-      volumeMounts:
-        - name: experiments-results
-          mountPath: /experiments
-  volumes:
-    - name: experiments-results
-      persistentVolumeClaim:
-        claimName: experiments-results
-EOF
-
-        # Copy the invoker binary into the pod
-        kubectl cp "$INVOKER_BINARY_SOURCE_PATH" "$POD_NAME:$DESTINATION_PATH/invoker"
-
-        # Create endpoints.json file inside the pod
-        kubectl exec -i "$POD_NAME" -- bash -c "cat > $DESTINATION_PATH/endpoints.json" <<EOF
-[
-  {
-    "hostname": "$SERVICE_NAME.default.svc.cluster.local"
-  }
-]
-EOF
-
-        # Create local Knative Service manifest
-        MANIFEST_FILE="./kn-rnn-serving-python-${i}.yaml"
 
         if [[ "$CRITICAL" == "true" ]]; then
             cat <<EOF > "$MANIFEST_FILE"
@@ -323,7 +270,76 @@ EOF
         fi
     done
 
-    echo "✓ All $NUMBER_OF_PODS invoker pods created successfully."
+    # Create the invoker pods
+    for i in $(seq 1 "$NUMBER_OF_PODS"); do
+        POD_NAME="${POD_BASE_NAME}-${i}"
+        SERVICE_NAME="${SERVICE_BASE_NAME}-${i}"
+
+        cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: $POD_NAME
+  namespace: default
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: $BUCKET_NODE
+  securityContext:
+    runAsUser: 0
+    runAsGroup: 0
+  containers:
+    - name: benchmark-container
+      image: debian:latest
+      command: ["tail", "-f", "/dev/null"]
+      resources:
+        requests:
+          memory: "64Mi"
+          cpu: "250m"
+        limits:
+          memory: "128Mi"
+          cpu: "500m"
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+        allowPrivilegeEscalation: true
+        privileged: true
+        readOnlyRootFilesystem: false
+      volumeMounts:
+        - name: experiments-results
+          mountPath: /experiments
+  volumes:
+    - name: experiments-results
+      persistentVolumeClaim:
+        claimName: experiments-results
+EOF
+    done
+
+    # Wait for all pods to be in Running state
+    echo "Waiting for invoker pods to be in 'Running' state..."
+    while [ "$(kubectl get pods --no-headers | { grep "^$POD_BASE_NAME" || true; } | { grep "Running" || true; } | wc -l)" -ne "$NUMBER_OF_PODS" ]; do
+        sleep 2
+    done
+    echo "Invoker pods are running!"
+
+    # Populate the invoker pods with invoker executable and endpoints.json files
+    for i in $(seq 1 "$NUMBER_OF_PODS"); do
+        POD_NAME="${POD_BASE_NAME}-${i}"
+        SERVICE_NAME="${SERVICE_BASE_NAME}-${i}"
+
+        # Copy the invoker binary into the pod
+        kubectl cp "$INVOKER_BINARY_SOURCE_PATH" "$POD_NAME:$DESTINATION_PATH/invoker"
+
+        # Create endpoints.json file inside the pod
+        kubectl exec -i "$POD_NAME" -- bash -c "cat > $DESTINATION_PATH/endpoints.json" <<EOF
+[
+  {
+    "hostname": "$SERVICE_NAME.default.svc.cluster.local"
+  }
+]
+EOF
+    done
+
+    echo "✓ All $NUMBER_OF_PODS invoker pods created successfully!"
 
 elif [[ "$CREATE" == "false" ]]; then
     echo "Deleting $NUMBER_OF_PODS invoker pods with base name '$POD_BASE_NAME'..."
@@ -340,5 +356,5 @@ elif [[ "$CREATE" == "false" ]]; then
         rm -f "$MANIFEST_FILE"
     done
 
-    echo "✓ All $NUMBER_OF_PODS invoker pods deleted successfully."
+    echo "✓ All $NUMBER_OF_PODS invoker pods deleted successfully!"
 fi
