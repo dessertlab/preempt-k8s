@@ -50,7 +50,7 @@ while getopts "f:t:i:e:m:p:q:o:d:n:s:r:b:u:c:h" opt; do
             echo "  -t <test-type>                  Type of test to run (default: Deployment)"
             echo "  -i <invoker-pod>                Invoker pod name in default namespace (default: benchmark-pod)"
             echo "  -e <invoker-path>               Path to invoker binary inside the pod (default: /home)"
-            echo "  -m <service-manifest>           Service manifest file (default: rnn-serving-service.yaml)"
+            echo "  -m <service-manifest>           Service manifest file (default: kn-rnn-serving-python.yaml)"
             echo "  -p <service-port>               Service port (default: 80)"
             echo "  -q <requests-per-second>        Requests per second (default: 50)"
             echo "  -o <timeout>                    Timeout for each request in seconds (default: 30)"
@@ -300,9 +300,9 @@ for i in $(seq 1 "$ITERATIONS"); do
             kubectl delete --all rtresources -n interference --ignore-not-found >/dev/null 2>&1 || true
         fi
         kubectl delete --all pods -n interference --ignore-not-found >/dev/null 2>&1 || true
-        while [ $(kubectl get pods --no-headers -n interference >/dev/null 2>&1 | wc -l) -gt 0 ]; do
+        while [ $(kubectl get pods --no-headers -n interference | wc -l) -gt 0 ]; do
             sleep 2
-        done
+        done >/dev/null 2>&1
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Interference namespace cleaned up!"
     fi
 
