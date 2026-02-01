@@ -405,6 +405,9 @@ for i in $(seq 1 "$ITERATIONS"); do
         fi
     fi
 
+    sleep 20
+    END_TIME=$(date +%s%N)
+
     # Clean up interfering load
     if [ "$NUMBER_OF_INTERFERING_RESOURCES" -gt 0 ]; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Cleaning up interference namespace..."
@@ -484,7 +487,6 @@ for i in $(seq 1 "$ITERATIONS"); do
 
     # We query Loki to retrieve control plane logs and save them to persistent storage
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Querying Loki for control plane logs..."
-    END_TIME=$(date +%s%N)
     LOKI_QUERY="{job=\"kubernetes-audit\"} | json "
     LOKI_OUTPUT_FILE="$RESULTS_DIR/loki-logs-iteration_${i}.json"
     kubectl exec "${INVOKER_POD_BASE_NAME}-1" -- bash -c "
