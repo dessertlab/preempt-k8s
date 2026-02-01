@@ -465,7 +465,11 @@ for i in $(seq 1 "$ITERATIONS"); do
         --data-urlencode "start=$START_TIME" \
         --data-urlencode "end=$END_TIME" \
         --data-urlencode "limit=5000" \
-        --data-urlencode "direction=forward" > "$LOKI_OUTPUT_FILE"
+        --data-urlencode "direction=forward" | \
+        jq '[.data.result[].values[] | {
+        timestamp: .[0],
+        log: (.[1] | fromjson)
+        }]' > "$LOKI_OUTPUT_FILE"
     kubectl cp ./"${LOKI_OUTPUT_FILE}" "${INVOKER_POD_BASE_NAME}-1:${RESULTS_DIR}/${LOKI_OUTPUT_FILE}" >/dev/null 2>&1
     rm ./"${LOKI_OUTPUT_FILE}"
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Loki logs saved to $LOKI_OUTPUT_FILE!"

@@ -350,11 +350,12 @@ elif [[ "$CREATE" == "false" ]]; then
         MANIFEST_FILE="./kn-rnn-serving-python-${i}.yaml"
         
         # Delete the invoker pod
-        kubectl delete pod "$POD_NAME" --ignore-not-found=true
+        kubectl delete pod "$POD_NAME" --ignore-not-found=true &
         
         # Remove the manifest file
         rm -f "$MANIFEST_FILE"
     done
+    wait
 
     echo "✓ All $NUMBER_OF_PODS invoker pods deleted successfully!"
 fi

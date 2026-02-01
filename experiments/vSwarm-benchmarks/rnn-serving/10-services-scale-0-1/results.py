@@ -101,6 +101,23 @@ def is_scale_up_event(log):
     if object_ref.get('apiVersion') != 'v1':
         return False
     
+    # check requestObject for replicas field
+    request_object = log.get('requestObject', [])
+    if not isinstance(request_object, list):
+        return False
+    
+    # Check if there's a patch operation that sets replicas to 1
+    has_replicas_patch = False
+    for patch_op in request_object:
+        if (patch_op.get('op') == 'replace' and 
+            patch_op.get('path') == '/spec/replicas' and 
+            patch_op.get('value') == 1):
+            has_replicas_patch = True
+            break
+    
+    if not has_replicas_patch:
+        return False
+
     # Check response status
     response_status = log.get('responseStatus', {})
     if response_status.get('code') != 200:
@@ -269,9 +286,9 @@ def parse_audit_logs_file(file_path, controller, service):
         raise ValueError(f"Unsupported controller: {controller}")
     
     if controller == "preempt-k8s":
-        service_name = f"{service}-00001-deployment"
-    elif controller == "kube-manager":
         service_name = f"{service}-00001-rtresource"
+    elif controller == "kube-manager":
+        service_name = f"{service}-00001-deployment"
 
     # Load audit logs
     with open(file_path, 'r') as f:
@@ -432,7 +449,6 @@ def save_boxplot(data, labels, title, ylabel, filename, directory):
 
 def save_cdf_plot(all_data, labels, title, xlabel, filename, directory):
     fig, ax = plt.subplots(figsize=(8, 6))
-    num_services = len(all_data)
     cmap = plt.get_cmap('tab10')
     
     for i, service_data in enumerate(all_data):
@@ -511,12 +527,12 @@ def main():
             
             print(f"Found {status_count} status files and {rps_count} rps files for {service_name}!")
             
-            if status_count != 30:
-                print(f"Error: Expected exactly 30 status files, but found {status_count} for {service_name}!")
+            if status_count != 5:
+                print(f"Error: Expected exactly 5 status files, but found {status_count} for {service_name}!")
                 sys.exit(1)
             
-            if rps_count != 30:
-                print(f"Error: Expected exactly 30 rps files, but found {rps_count} for {service_name}!")
+            if rps_count != 5:
+                print(f"Error: Expected exactly 5 rps files, but found {rps_count} for {service_name}!")
                 sys.exit(1)
     
     all_audit_files = []
@@ -526,8 +542,8 @@ def main():
 
     print(f"Found {audit_count} audit logs files in total!")
 
-    if audit_count != 30:
-        print(f"Error: Expected exactly 30 audit logs files, but found {audit_count}!")
+    if audit_count != 5:
+        print(f"Error: Expected exactly 5 audit logs files, but found {audit_count}!")
         sys.exit(1)
     
     print("File count validation passed!")
@@ -561,10 +577,10 @@ def main():
         pod_creation_delays = []
         pod_start_delays = []
 
-        for j in range(30):
+        for j in range(5):
             service_id = f"rnn-serving-python-{i+1}"
             service_name = f"service-{i+1}"
-            audit_logs_file = os.path.join(root_path, f"loki-logs-iteration-{j+1}.json")
+            audit_logs_file = os.path.join(root_path, f"loki-logs-iteration_{j+1}.json")
             
             if os.path.isfile(audit_logs_file):
                 print(f"\nProcessing audit logs for {service_id}...")
