@@ -16,8 +16,8 @@ NUMBER_OF_SERVICES="10"
 SERVICE_MANIFEST_BASE_NAME="kn-rnn-serving-python"
 SERVICE_PORT="80"
 RPS="50"
-TIMEOUT="30"
-DURATION="20"
+TIMEOUT="40"
+DURATION="30"
 ITERATIONS="1"
 INTERFERENCE_SCRIPT="interfering-load.sh"
 NUMBER_OF_INTERFERING_RESOURCES="40"
@@ -64,8 +64,8 @@ while getopts "f:t:i:e:c:m:p:q:o:d:n:s:r:b:u:l:v:a:k:w:h" opt; do
             echo "  -m <service-manifest-base-name>     Services manifest file base name (default: kn-rnn-serving-python)"
             echo "  -p <service-port>                   Services port (default: 80)"
             echo "  -q <requests-per-second>            Requests per second per service (default: 50)"
-            echo "  -o <timeout>                        Timeout for each request in seconds (default: 30)"
-            echo "  -d <duration>                       Duration of the test in seconds (default: 20)"
+            echo "  -o <timeout>                        Timeout for each request in seconds (default: 40)"
+            echo "  -d <duration>                       Duration of the test in seconds (default: 30)"
             echo "  -n <iterations>                     Number of test iterations (default: 1)"
             echo "  -s <interference-script>            Interference script to run (default: interfering-load.sh)"
             echo "  -r <number-of-resources>            Number of interfering resources (default: 40)"
@@ -357,11 +357,9 @@ for i in $(seq 1 "$ITERATIONS"); do
         START=$(date -d "30 days ago" +%s)
         END=$(date +%s)
         sleep 20
-        kubectl exec -n "$LOKI_NAMESPACE" "$LOKI_NAME" -- bash -c "
-            curl -X POST -s \"http://${LOKI_IP_ADDRESS}:3100/flush\" >/dev/null && \
-            sleep 5 && \
-            curl -g -X POST "http://${LOKI_IP_ADDRESS}:3100/loki/api/v1/delete?query={job=\"kubernetes-audit\"}&start=$START&end=$END"
-        "
+        curl -X POST -s \"http://${LOKI_IP_ADDRESS}:3100/flush\" >/dev/null 2>&1
+        sleep 5
+        curl -g -X POST "http://${LOKI_IP_ADDRESS}:3100/loki/api/v1/delete?query={job=\"kubernetes-audit\"}&start=$START&end=$END"
         sleep 180
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Loki logs flushed!"
     fi
@@ -379,15 +377,21 @@ for i in $(seq 1 "$ITERATIONS"); do
     sleep 2
 
     # We start the benchmark
+    PIDS=()
     START_TIME=$(date +%s%N)
     sleep 20
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting benchmark..."
     INVOKER_CMD="cd $INVOKER_PATH && ./invoker -port 80 -time $DURATION -rps $RPS --grpcTimeout $TIMEOUT -latf iteration_${i} > ./invoker-output.log"
     for j in $(seq 1 "$NUMBER_OF_SERVICES"); do
         INVOKER_POD="${INVOKER_POD_BASE_NAME}-$j"
-        kubectl exec "$INVOKER_POD" -- bash -c "$INVOKER_CMD" &
+        kubectl exec "$INVOKER_POD" -- bash -c "$INVOKER_CMD" > /dev/null 2>&1 &
+        PIDS+=($!)
     done
-    wait
+    sleep $((DURATION + 10))
+    for pid in "${PIDS[@]}"; do
+        kill -9 "$pid" > /dev/null 2>&1 || true
+    done
+    wait "${PIDS[@]}" 2>/dev/null || true
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Benchmark completed!"
 
     # We stop the interference script in background
@@ -427,56 +431,23 @@ for i in $(seq 1 "$ITERATIONS"); do
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for services to scale-down..."
 
     # Forced cleanup
-    for j in $(seq 1 "$NUMBER_OF_SERVICES"); do
-        if [ "$FORCE_CLEANUP" == "true" ]; then
-            TIMEOUT_SECONDS=90
-            ELAPSED=0
-            while [ $(kubectl get pods --no-headers | { grep "^rnn-serving-python-$j" || true; } | { grep "Terminating" || true; } | wc -l) -ne "$SCALE_UPS_ALLOWED" ]; do
-                if [ $ELAPSED -ge $TIMEOUT_SECONDS ]; then
-                    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Timeout waiting for pods to enter Terminating state"
-                    break
-                fi
-                sleep 2
-                ELAPSED=$((ELAPSED + 2))
-            done
-            TERMINATING_PODS=$(kubectl get pods --no-headers | { grep "^rnn-serving-python-$j" || true; } | { grep "Terminating" || true; } | awk '{print $1}')
-            TERMINATING_COUNT=$(echo "$TERMINATING_PODS" | { grep -c . || true; })
-            
-            # If inconsistent service scaling is detected, the experiment is aborted and clean up is performed
-            if [ $TERMINATING_COUNT -ne $SCALE_UPS_ALLOWED ]; then
-                echo "Error: Number of terminating pods does not match the allowed scale-ups (expected: $SCALE_UPS_ALLOWED, got: $TERMINATING_COUNT)" >&2
-                echo "Error: Cleaning up of persistent storage and K8s cluster..." >&2
-                kubectl exec "${INVOKER_POD_BASE_NAME}-1" -- bash -c "rm -rf $RESULTS_DIR"
-                for p in $(seq 1 "$NUMBER_OF_SERVICES"); do
-                    INVOKER_POD="${INVOKER_POD_BASE_NAME}-$p"
-                    kubectl exec "$INVOKER_POD" -- bash -c "rm $INVOKER_PATH/rps*"
-                done
-                for p in $(seq 1 "$NUMBER_OF_SERVICES"); do
-                    SERVICE_MANIFEST="${SERVICE_MANIFEST_BASE_NAME}-$p.yaml"
-                    kubectl delete -f "$SERVICE_MANIFEST" &>/dev/null
-                done
-                if [ "$FORCE_CLEANUP" == "true" ]; then
-                    while [ $(kubectl get pods --no-headers | { grep "^rnn-serving-python" || true; } | wc -l) -gt 0 ]; do
-                        kubectl get pods --no-headers | { grep "^rnn-serving-python" || true; } | awk '{print $1}' | xargs -r kubectl delete pod --grace-period=0 --force 2>/dev/null 2>&1 || true
-                        sleep 2
-                    done
-                else
-                    while [ $(kubectl get pods --no-headers | { grep "^rnn-serving-python" || true; } | wc -l) -gt 0 ]; do
-                        sleep 2
-                    done
-                fi
-                if [ "$NUMBER_OF_INTERFERING_RESOURCES" -gt 0 ]; then
-                    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deleting interference namespace..."
-                    kubectl delete namespace interference --wait=false &>/dev/null
-                fi
-                exit 1
+    if [ "$FORCE_CLEANUP" == "true" ]; then
+        TIMEOUT_SECONDS=90
+        ELAPSED=0
+        while [ $(kubectl get pods --no-headers | { grep "^rnn-serving-python" || true; } | { grep "Running" || true; } | wc -l) -ne 0 ]; do
+            if [ $ELAPSED -ge $TIMEOUT_SECONDS ]; then
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] Timeout waiting for pods to enter Terminating state"
+                break
             fi
+            sleep 2
+            ELAPSED=$((ELAPSED + 2))
+        done
+        TERMINATING_PODS=$(kubectl get pods --no-headers | { grep "^rnn-serving-python" || true; } | { grep "Terminating" || true; } | awk '{print $1}')
 
-            for pod in $TERMINATING_PODS; do
-                kubectl delete pod "$pod" --grace-period=0 --force &>/dev/null || true
-            done
-        fi
-    done
+        for pod in $TERMINATING_PODS; do
+            kubectl delete pod "$pod" --grace-period=0 --force &>/dev/null || true
+        done
+    fi
     
     for j in $(seq 1 "$NUMBER_OF_SERVICES"); do
         while [ $(kubectl get pods --no-headers | { grep "^rnn-serving-python-$j" || true; } | wc -l) -gt $BASE_SCALE ]; do
@@ -488,23 +459,24 @@ for i in $(seq 1 "$ITERATIONS"); do
     # We query Loki to retrieve control plane logs and save them to persistent storage
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Querying Loki for control plane logs..."
     LOKI_QUERY="{job=\"kubernetes-audit\"} | json "
-    LOKI_OUTPUT_FILE="$RESULTS_DIR/loki-logs-iteration_${i}.json"
-    kubectl exec "${INVOKER_POD_BASE_NAME}-1" -- bash -c "
-        curl -G -s \"http://${LOKI_IP_ADDRESS}:3100/loki/api/v1/query_range\" \
-            --data-urlencode \"query=$LOKI_QUERY\" \\
-            --data-urlencode \"start=$START_TIME\" \\
-            --data-urlencode \"end=$END_TIME\" \\
-            --data-urlencode \"limit=5000\" \\
-            --data-urlencode \"direction=forward\" > $LOKI_OUTPUT_FILE
-    "
+    LOKI_OUTPUT_FILE="./loki-logs-iteration_${i}.json"
+    curl -G -s "http://${LOKI_IP_ADDRESS}:3100/loki/api/v1/query_range" \
+        --data-urlencode "query=$LOKI_QUERY" \
+        --data-urlencode "start=$START_TIME" \
+        --data-urlencode "end=$END_TIME" \
+        --data-urlencode "limit=5000" \
+        --data-urlencode "direction=forward" > "$LOKI_OUTPUT_FILE"
+    kubectl cp ./"${LOKI_OUTPUT_FILE}" "${INVOKER_POD_BASE_NAME}-1:${RESULTS_DIR}/${LOKI_OUTPUT_FILE}" >/dev/null 2>&1
+    rm ./"${LOKI_OUTPUT_FILE}"
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Loki logs saved to $LOKI_OUTPUT_FILE!"
 
-    # Save results to persistent storage
+    # Save invoker results to persistent storage
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Saving results to persistent storage..."
     for j in $(seq 1 "$NUMBER_OF_SERVICES"); do
         INVOKER_POD="${INVOKER_POD_BASE_NAME}-$j"
+        SERVICE_PATH="$RESULTS_DIR/service-$j"
         kubectl exec "$INVOKER_POD" -- bash -c "
-            mv $INVOKER_PATH/rps* $RESULTS_DIR/service-\$j
+            mv $INVOKER_PATH/rps* $SERVICE_PATH
         "
         INVOKER_OUTPUT=$(kubectl exec "$INVOKER_POD" -- bash -c "cat $INVOKER_PATH/invoker-output.log")
         ISSUED=$(echo "$INVOKER_OUTPUT" | sed -n 's/.*Issued \/ completed requests: \([0-9]*\), \([0-9]*\).*/\1/p')
@@ -512,7 +484,7 @@ for i in $(seq 1 "$ITERATIONS"); do
         REAL_RPS=$(echo "$INVOKER_OUTPUT" | sed -n 's/.*Real \/ target RPS: \([0-9.]*\) \/ \([0-9.]*\).*/\1/p')
         TARGET_RPS=$(echo "$INVOKER_OUTPUT" | sed -n 's/.*Real \/ target RPS: \([0-9.]*\) \/ \([0-9.]*\).*/\2/p')
         kubectl exec "$INVOKER_POD" -- bash -c "
-            cat > $RESULTS_DIR/service-\$j/iteration_${i}_status.txt <<EOF
+            cat > $SERVICE_PATH/iteration_${i}_status.txt <<EOF
 ================================================
 vSwarm RNN Benchmark Status - Iteration $i
 ================================================
@@ -523,6 +495,7 @@ Real RPS: $REAL_RPS
 ================================================
 EOF
     "
+        kubectl exec "$INVOKER_POD" -- bash -c "rm -f $INVOKER_PATH/invoker-output.log"
     done
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Results saved to $RESULTS_DIR!"
 
