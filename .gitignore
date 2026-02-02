@@ -2,6 +2,8 @@
 target
 
 # Experiments
-experiments/vSwarm-benchmarks/rnn-serving/10-services-scale-0-1/results
-experiments/vSwarm-benchmarks/rnn-serving/trials/scale-0-1/results
-experiments/vSwarm-benchmarks/rnn-serving/trials/scale-1-2/results
+*results
+
+# Cache Files
+*.pyc
+*__pycache__/
