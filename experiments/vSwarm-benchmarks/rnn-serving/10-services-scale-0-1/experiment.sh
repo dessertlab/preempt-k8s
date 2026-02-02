@@ -100,7 +100,7 @@ fi
 # Validate invoker pods
 EXISTING_PODS=$(kubectl get pods --no-headers 2>/dev/null | { grep "^$INVOKER_POD_BASE_NAME" || true; } | wc -l)
 if [[ "$EXISTING_PODS" -ne "$NUMBER_OF_SERVICES" ]]; then
-    echo "Error: Pods number to delete ($EXISTING_PODS) does not match the specified number ($NUMBER_OF_SERVICES)" >&2
+    echo "Error: Invoker pods number ($EXISTING_PODS) does not match the specified number ($NUMBER_OF_SERVICES)" >&2
     exit 1
 fi
 
