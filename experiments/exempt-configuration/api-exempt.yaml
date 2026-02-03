@@ -1,0 +1,39 @@
+apiVersion: flowcontrol.apiserver.k8s.io/v1
+kind: FlowSchema
+metadata:
+  annotations:
+  name: critical-application
+spec:
+  matchingPrecedence: 3
+  priorityLevelConfiguration:
+    name: exempt
+  rules:
+  - nonResourceRules:
+    - nonResourceURLs:
+      - '*'
+      verbs:
+      - '*'
+    resourceRules:
+    - apiGroups:
+      - ""
+      - apps
+      - rtgroup.critical.com
+      clusterScope: false
+      namespaces:
+      - default
+      resources:
+      - pods
+      - pods/status
+      - deployments
+      - deployments/status
+      - rtresources
+      - rtresources/status
+      verbs:
+      - '*'
+    subjects:
+    - group:
+        name: system:unauthenticated
+      kind: Group
+    - group:
+        name: system:authenticated
+      kind: Group
