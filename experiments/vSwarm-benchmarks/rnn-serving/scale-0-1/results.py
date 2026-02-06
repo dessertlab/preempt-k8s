@@ -484,7 +484,7 @@ def save_cdf_plot(all_data, labels, title, xlabel, filename, directory):
 def main():
     # Validate command line arguments
     if len(sys.argv) != 4:
-        print("Usage: python analyze_results.py <path_to_results_directory> <number_of_services> <controller_name>")
+        print("Usage: python results.py <path_to_results_directory> <number_of_services> <controller_name>")
         sys.exit(1)
     
     root_path = sys.argv[1]
@@ -627,6 +627,9 @@ def main():
     mean_completed = {}
     max_completed = {}
     all_completed_requests = []
+    real_rps = {}
+    max_real_rps = {}
+    all_real_rps = []
 
     mean_of_mean_latencies = {}
     all_mean_latencies = []
@@ -644,6 +647,7 @@ def main():
 
         lost_requests = []
         completed_requests = []
+        real_rps_values = []
         
         for status_file in sorted(status_files[service_name]):
             file_path = os.path.join(root_path, service_name, status_file)
@@ -652,11 +656,13 @@ def main():
                 lost = data['issued'] - data['completed']
                 lost_requests.append(lost)
                 completed_requests.append(data['completed'])
+                real_rps_values.append(data['real_rps'])
             except ValueError as e:
                 print(f"Error: {e}")
                 sys.exit(1)
         all_lost_requests.append(lost_requests)
         all_completed_requests.append(completed_requests)
+        all_real_rps.append(real_rps_values)
 
         # Calculate statistics for lost requests
         mean_lost[service_name] = sum(lost_requests) / len(lost_requests)
@@ -665,6 +671,10 @@ def main():
         # Calculate statistics for completed requests
         mean_completed[service_name] = sum(completed_requests) / len(completed_requests)
         max_completed[service_name] = max(completed_requests)
+
+        # Calculate statistics for real RPS
+        real_rps[service_name] = sum(real_rps_values) / len(real_rps_values)
+        max_real_rps[service_name] = max(real_rps_values)
         
         # Process all rps files for the current service
         print(f"\nProcessing rps files for {service_name}...")
@@ -698,6 +708,7 @@ def main():
                          'Mean Latencies [ms]', 'Max Latencies [ms]',
                          'Mean Lost Requests', 'Max Lost Requests',
                          'Mean Completed Requests', 'Max Completed Requests',
+                         'Mean Real RPS', 'Max Real RPS',
                          'Starts Processing Delay Mean [ms]', 'Starts Processing Delay Max [ms]',
                          'Pod Creation Delay Mean [ms]', 'Pod Creation Delay Max [ms]',
                          'Pod Startup Delay Mean [ms]', 'Pod Startup Delay Max [ms]'
@@ -709,6 +720,7 @@ def main():
                 f"{mean_of_mean_latencies[service_name]:.2f}", f"{mean_of_max_latencies[service_name]:.2f}",
                 f"{mean_lost[service_name]:.2f}", max_lost[service_name],
                 f"{mean_completed[service_name]:.2f}", max_completed[service_name],
+                f"{real_rps[service_name]:.2f}", f"{max_real_rps[service_name]:.2f}",
                 f"{mean_starts_processing_delay[service_name]:.2f}", f"{max_starts_processing_delay[service_name]:.2f}",
                 f"{mean_pod_creation_delay[service_name]:.2f}", f"{max_pod_creation_delay[service_name]:.2f}",
                 f"{mean_pod_startup_delay[service_name]:.2f}", f"{max_pod_startup_delay[service_name]:.2f}"
@@ -724,6 +736,7 @@ def main():
         (all_pod_startup_delays, "Pod Startup Delays Box Plot", "Delays [ms]", "boxplot_pod_startup_delays.png"),
         (all_lost_requests, "Lost Requests Box Plot", "Number of Requests", "boxplot_lost_requests.png"),
         (all_completed_requests, "Completed Requests Box Plot", "Number of Requests", "boxplot_completed_requests.png"),
+        (all_real_rps, "Real RPS Box Plot", "Real RPS", "boxplot_real_rps.png"),
         (all_mean_latencies, "Mean Latencies Box Plot", "Latencies [ms]", "boxplot_mean_latencies.png"),
         (all_max_latencies, "Max Latencies Box Plot", "Latencies [ms]", "boxplot_max_latencies.png")
     ]

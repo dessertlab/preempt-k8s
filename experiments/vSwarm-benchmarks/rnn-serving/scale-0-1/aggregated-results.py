@@ -166,6 +166,7 @@ def process_experiment_data(root_path, num_services, controller_name):
     print("\nProcessing status and rps files...")
     all_lost_requests = []
     all_completed_requests = []
+    all_real_rps = []
     all_mean_latencies = []
     all_max_latencies = []
     
@@ -176,6 +177,7 @@ def process_experiment_data(root_path, num_services, controller_name):
         iteration_lost_requests = []
         iteration_completed_requests = []
         iteration_all_latencies = []
+        iteration_real_rps = []
         
         for i in range(num_services):
             service_name = f"service-{i+1}"
@@ -189,6 +191,7 @@ def process_experiment_data(root_path, num_services, controller_name):
                     lost = status_data['issued'] - status_data['completed']
                     iteration_lost_requests.append(lost)
                     iteration_completed_requests.append(status_data['completed'])
+                    iteration_real_rps.append(status_data['real_rps'])
                 except Exception as e:
                     print(f"    Error parsing {status_file}: {str(e)}")
             
@@ -206,6 +209,7 @@ def process_experiment_data(root_path, num_services, controller_name):
         # Sum for requests (total across all services)
         total_lost = sum(iteration_lost_requests) if iteration_lost_requests else 0
         total_completed = sum(iteration_completed_requests) if iteration_completed_requests else 0
+        total_real_rps = sum(iteration_real_rps) if iteration_real_rps else 0
         
         # Calculate mean and max on ALL latencies from all services
         if iteration_all_latencies:
@@ -220,6 +224,7 @@ def process_experiment_data(root_path, num_services, controller_name):
         # Append aggregated values for this iteration
         all_lost_requests.append(total_lost)
         all_completed_requests.append(total_completed)
+        all_real_rps.append(total_real_rps)
         all_mean_latencies.append(mean_latency)
         all_max_latencies.append(max_latency)
     
@@ -229,6 +234,7 @@ def process_experiment_data(root_path, num_services, controller_name):
         'pod_startup_delays': all_pod_startup_delays,
         'lost_requests': all_lost_requests,
         'completed_requests': all_completed_requests,
+        'real_rps': all_real_rps,
         'mean_latencies': all_mean_latencies,
         'max_latencies': all_max_latencies
     }
@@ -237,7 +243,7 @@ def process_experiment_data(root_path, num_services, controller_name):
 def main():
     # Validate command line arguments
     if len(sys.argv) != 4:
-        print("Usage: python compare-results.py <path_to_kube_manager_results> <path_to_preempt_k8s_results> <number_of_services>")
+        print("Usage: python aggregated-results.py <path_to_kube_manager_results> <path_to_preempt_k8s_results> <number_of_services>")
         sys.exit(1)
     
     km_path = sys.argv[1]
@@ -261,8 +267,7 @@ def main():
     km_path_obj = Path(km_path).resolve()
     pk8s_path_obj = Path(pk8s_path).resolve()
     
-    results_dir = km_path_obj.parent.parent.parent
-    compared_dir = results_dir / "aggregated"
+    compared_dir = Path("results/aggregated")
 
     km_exp = km_path_obj.parent.name
     km_timestamp = km_path_obj.name
@@ -297,6 +302,7 @@ def main():
             'Mean of Max Latencies [ms]', 'Std of Max Latencies [ms]',
             'Mean of Lost Requests', 'Std of Lost Requests',
             'Mean of Completed Requests', 'Std of Completed Requests',
+            'Mean of Real RPS', 'Std of Real RPS',
             'Mean Starts Processing Delay [ms]', 'Std Starts Processing Delay [ms]',
             'Mean Pod Creation Delay [ms]', 'Std Pod Creation Delay [ms]',
             'Mean Pod Startup Delay [ms]', 'Std Pod Startup Delay [ms]'
@@ -313,6 +319,8 @@ def main():
             np.std(km_flat['lost_requests']),
             np.mean(km_flat['completed_requests']),
             np.std(km_flat['completed_requests']),
+            np.mean(km_flat['real_rps']),
+            np.std(km_flat['real_rps']),
             np.mean(km_flat['starts_processing_delays']),
             np.std(km_flat['starts_processing_delays']),
             np.mean(km_flat['pod_creation_delays']),
@@ -332,6 +340,8 @@ def main():
             np.std(pk8s_flat['lost_requests']),
             np.mean(pk8s_flat['completed_requests']),
             np.std(pk8s_flat['completed_requests']),
+            np.mean(pk8s_flat['real_rps']),
+            np.std(pk8s_flat['real_rps']),
             np.mean(pk8s_flat['starts_processing_delays']),
             np.std(pk8s_flat['starts_processing_delays']),
             np.mean(pk8s_flat['pod_creation_delays']),
@@ -353,6 +363,7 @@ def main():
         ('pod_startup_delays', "Comparative Pod Startup Delays", "Delays [ms]", "comparative_boxplot_pod_startup_delays.png"),
         ('lost_requests', "Comparative Lost Requests", "Number of Requests", "comparative_boxplot_lost_requests.png"),
         ('completed_requests', "Comparative Completed Requests", "Number of Requests", "comparative_boxplot_completed_requests.png"),
+        ('real_rps', "Comparative Real RPS", "Real RPS", "comparative_boxplot_real_rps.png"),
         ('mean_latencies', "Comparative Mean Latencies", "Latencies [ms]", "comparative_boxplot_mean_latencies.png"),
         ('max_latencies', "Comparative Max Latencies", "Latencies [ms]", "comparative_boxplot_max_latencies.png")
     ]

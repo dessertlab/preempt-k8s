@@ -184,6 +184,7 @@ def process_experiment_data(root_path, num_services, controller_name):
     print("\nProcessing status and rps files...")
     all_lost_requests = []
     all_completed_requests = []
+    all_real_rps = []
     all_mean_latencies = []
     all_max_latencies = []
     
@@ -193,6 +194,7 @@ def process_experiment_data(root_path, num_services, controller_name):
         # Process status files
         lost_requests = []
         completed_requests = []
+        real_rps = []
         
         for status_file in sorted(status_files[service_name]):
             file_path = os.path.join(root_path, service_name, status_file)
@@ -201,11 +203,13 @@ def process_experiment_data(root_path, num_services, controller_name):
                 lost = status_data['issued'] - status_data['completed']
                 lost_requests.append(lost)
                 completed_requests.append(status_data['completed'])
+                real_rps.append(status_data['real_rps'])
             except Exception as e:
                 print(f"    Error parsing {status_file}: {str(e)}")
         
         all_lost_requests.append(lost_requests)
         all_completed_requests.append(completed_requests)
+        all_real_rps.append(real_rps)
         
         # Process rps files
         mean_latencies = []
@@ -231,6 +235,7 @@ def process_experiment_data(root_path, num_services, controller_name):
         'pod_startup_delays': all_pod_startup_delays,
         'lost_requests': all_lost_requests,
         'completed_requests': all_completed_requests,
+        'real_rps': all_real_rps,
         'mean_latencies': all_mean_latencies,
         'max_latencies': all_max_latencies
     }
@@ -263,8 +268,7 @@ def main():
     km_path_obj = Path(km_path).resolve()
     pk8s_path_obj = Path(pk8s_path).resolve()
     
-    results_dir = km_path_obj.parent.parent.parent
-    compared_dir = results_dir / "compared"
+    compared_dir = Path("results/compared")
 
     km_exp = km_path_obj.parent.name
     km_timestamp = km_path_obj.name
@@ -297,6 +301,7 @@ def main():
             'Mean Latencies [ms]', 'Max Latencies [ms]',
             'Mean Lost Requests', 'Max Lost Requests',
             'Mean Completed Requests', 'Max Completed Requests',
+            'Mean Real RPS', 'Max Real RPS',
             'Starts Processing Delay Mean [ms]', 'Starts Processing Delay Max [ms]',
             'Pod Creation Delay Mean [ms]', 'Pod Creation Delay Max [ms]',
             'Pod Startup Delay Mean [ms]', 'Pod Startup Delay Max [ms]'
@@ -315,6 +320,8 @@ def main():
                     max(km_data['lost_requests'][i]) if km_data['lost_requests'][i] else 0,
                     sum(km_data['completed_requests'][i]) / len(km_data['completed_requests'][i]),
                     max(km_data['completed_requests'][i]) if km_data['completed_requests'][i] else 0,
+                    sum(km_data['real_rps'][i]) / len(km_data['real_rps'][i]),
+                    max(km_data['real_rps'][i]) if km_data['real_rps'][i] else 0,
                     sum(km_data['starts_processing_delays'][i]) / len(km_data['starts_processing_delays'][i]) if km_data['starts_processing_delays'][i] else 0,
                     max(km_data['starts_processing_delays'][i]) if km_data['starts_processing_delays'][i] else 0,
                     sum(km_data['pod_creation_delays'][i]) / len(km_data['pod_creation_delays'][i]) if km_data['pod_creation_delays'][i] else 0,
@@ -333,6 +340,8 @@ def main():
                     max(pk8s_data['lost_requests'][i]) if pk8s_data['lost_requests'][i] else 0,
                     sum(pk8s_data['completed_requests'][i]) / len(pk8s_data['completed_requests'][i]),
                     max(pk8s_data['completed_requests'][i]) if pk8s_data['completed_requests'][i] else 0,
+                    sum(pk8s_data['real_rps'][i]) / len(pk8s_data['real_rps'][i]),
+                    max(pk8s_data['real_rps'][i]) if pk8s_data['real_rps'][i] else 0,
                     sum(pk8s_data['starts_processing_delays'][i]) / len(pk8s_data['starts_processing_delays'][i]) if pk8s_data['starts_processing_delays'][i] else 0,
                     max(pk8s_data['starts_processing_delays'][i]) if pk8s_data['starts_processing_delays'][i] else 0,
                     sum(pk8s_data['pod_creation_delays'][i]) / len(pk8s_data['pod_creation_delays'][i]) if pk8s_data['pod_creation_delays'][i] else 0,
@@ -354,6 +363,7 @@ def main():
         ('pod_startup_delays', "Comparative Pod Startup Delays", "Delays [ms]", "comparative_boxplot_pod_startup_delays.png"),
         ('lost_requests', "Comparative Lost Requests", "Number of Requests", "comparative_boxplot_lost_requests.png"),
         ('completed_requests', "Comparative Completed Requests", "Number of Requests", "comparative_boxplot_completed_requests.png"),
+        ('real_rps', "Comparative Real RPS", "Real RPS", "comparative_boxplot_real_rps.png"),
         ('mean_latencies', "Comparative Mean Latencies", "Latencies [ms]", "comparative_boxplot_mean_latencies.png"),
         ('max_latencies', "Comparative Max Latencies", "Latencies [ms]", "comparative_boxplot_max_latencies.png")
     ]

@@ -499,7 +499,7 @@ Real RPS: $REAL_RPS
 ================================================
 EOF
     "
-        kubectl exec "$INVOKER_POD" -- bash -c "rm -f $INVOKER_PATH/invoker-output.log"
+        kubectl exec "$INVOKER_POD" -- bash -c "mv $INVOKER_PATH/invoker-output.log $RESULTS_DIR/iteration_${i}_invoker-output.log"
     done
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Results saved to $RESULTS_DIR!"
 
