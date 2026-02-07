@@ -19,6 +19,7 @@ RPS="50"
 TIMEOUT="40"
 DURATION="30"
 ITERATIONS="1"
+OFFSET="0"
 INTERFERENCE_SCRIPT="interfering-load.sh"
 NUMBER_OF_INTERFERING_RESOURCES="40"
 BASE_SCALE="0"
@@ -30,7 +31,7 @@ LOKI_FLUSH="false"
 FORCE_CLEANUP="true"
 
 # Parse command line flags
-while getopts "f:t:i:e:c:m:p:q:o:d:n:s:r:b:u:l:v:a:k:w:h" opt; do
+while getopts "f:t:i:e:c:m:p:q:o:d:n:g:s:r:b:u:l:v:a:k:w:h" opt; do
     case $opt in
         f) EXPERIMENT_NAME="$OPTARG" ;;
         t) TEST_TYPE="$OPTARG" ;;
@@ -43,6 +44,7 @@ while getopts "f:t:i:e:c:m:p:q:o:d:n:s:r:b:u:l:v:a:k:w:h" opt; do
         o) TIMEOUT="$OPTARG" ;;
         d) DURATION="$OPTARG" ;;
         n) ITERATIONS="$OPTARG" ;;
+        g) OFFSET="$OPTARG" ;;
         s) INTERFERENCE_SCRIPT="$OPTARG" ;;
         r) NUMBER_OF_INTERFERING_RESOURCES="$OPTARG" ;;
         b) BASE_SCALE="$OPTARG" ;;
@@ -67,6 +69,7 @@ while getopts "f:t:i:e:c:m:p:q:o:d:n:s:r:b:u:l:v:a:k:w:h" opt; do
             echo "  -o <timeout>                        Timeout for each request in seconds (default: 40)"
             echo "  -d <duration>                       Duration of the test in seconds (default: 30)"
             echo "  -n <iterations>                     Number of test iterations (default: 1)"
+            echo "  -g <offset>                         Iterations offset (default: 0)"
             echo "  -s <interference-script>            Interference script to run (default: interfering-load.sh)"
             echo "  -r <number-of-resources>            Number of interfering resources (default: 40)"
             echo "  -b <base-scale>                     Base scale for the tested services (default: 0)"
@@ -167,6 +170,12 @@ if ! [[ "$ITERATIONS" =~ ^[0-9]+$ ]] || [[ "$ITERATIONS" -lt 1 ]]; then
     exit 1
 fi
 
+# Validate offset is a non-negative number and lower than iterations
+if ! [[ "$OFFSET" =~ ^[0-9]+$ ]] || [[ "$OFFSET" -lt 0 ]] || [[ "$OFFSET" -ge "$ITERATIONS" ]]; then
+    echo "Error: Offset must be a non-negative number and lower than iterations (got: $OFFSET)" >&2
+    exit 1
+fi
+
 # Validate interference script file
 if [[ ! -f "$INTERFERENCE_SCRIPT" ]]; then
     echo "Error: Interference script file '$INTERFERENCE_SCRIPT' does not exist" >&2
@@ -241,6 +250,7 @@ echo "RPS: $RPS"
 echo "Timeout: $TIMEOUT seconds"
 echo "Duration: $DURATION seconds"
 echo "Iterations: $ITERATIONS"
+echo "Offset: $OFFSET"
 echo "Interference Script: $INTERFERENCE_SCRIPT"
 echo "Number of Interfering Resources: $NUMBER_OF_INTERFERING_RESOURCES"
 echo "Base Scale: $BASE_SCALE"
@@ -271,40 +281,45 @@ fi
 # Create results directory
 echo "Creating results directory..."
 if [ "$TEST_TYPE" == "Deployment" ]; then
-    RESULTS_DIR="/experiments/knative/vSwarm-benchmarks/rnn-serving/kube-manager/$EXPERIMENT_NAME/$(date '+%Y-%m-%d_%H-%M-%S')"
+    RESULTS_DIR="/experiments/knative/vSwarm-benchmarks/rnn-serving/kube-manager/$EXPERIMENT_NAME"
 elif [ "$TEST_TYPE" == "RTResource" ]; then
-    RESULTS_DIR="/experiments/knative/vSwarm-benchmarks/rnn-serving/preempt-k8s/$EXPERIMENT_NAME/$(date '+%Y-%m-%d_%H-%M-%S')"
+    RESULTS_DIR="/experiments/knative/vSwarm-benchmarks/rnn-serving/preempt-k8s/$EXPERIMENT_NAME"
 fi
-kubectl exec "${INVOKER_POD_BASE_NAME}-1" -- bash -c "
-    mkdir -p $RESULTS_DIR && \
-    for i in \$(seq 1 $NUMBER_OF_SERVICES); do
-        mkdir -p $RESULTS_DIR/service-\$i
-    done
-"
+
+if [ "$OFFSET" -eq 0 ]; then
+    kubectl exec "${INVOKER_POD_BASE_NAME}-1" -- bash -c "
+        mkdir -p $RESULTS_DIR && \
+        for i in \$(seq 1 $NUMBER_OF_SERVICES); do
+            mkdir -p $RESULTS_DIR/service-\$i
+        done
+    "
+fi
 echo "Results will be stored in: $RESULTS_DIR"
 echo ""
 
 # Save configuration to file in the pod
-echo "Saving test configuration..."
-kubectl exec "${INVOKER_POD_BASE_NAME}-1" -- bash -c "
-    cat > $RESULTS_DIR/config.txt <<EOF
-================================================
-vSwarm RNN Benchmark - Test Configuration
-================================================
-Experiment Name: $EXPERIMENT_NAME
-Test Type: $TEST_TYPE
-Number of Services: $NUMBER_OF_SERVICES
-RPS per service: $RPS
-Timeout: $TIMEOUT seconds
-Duration: $DURATION seconds
-Iterations: $ITERATIONS
-Number of Interfering Resources: $NUMBER_OF_INTERFERING_RESOURCES
-Base Scale per service: $BASE_SCALE
-Scale-Ups Allowed per service: $SCALE_UPS_ALLOWED
-================================================
-EOF
-"
-echo ""
+if [ "$OFFSET" -eq 0 ]; then
+    echo "Saving test configuration..."
+    kubectl exec "${INVOKER_POD_BASE_NAME}-1" -- bash -c "
+        cat > $RESULTS_DIR/config.txt <<EOF
+    ================================================
+    vSwarm RNN Benchmark - Test Configuration
+    ================================================
+    Experiment Name: $EXPERIMENT_NAME
+    Test Type: $TEST_TYPE
+    Number of Services: $NUMBER_OF_SERVICES
+    RPS per service: $RPS
+    Timeout: $TIMEOUT seconds
+    Duration: $DURATION seconds
+    Iterations: $ITERATIONS
+    Number of Interfering Resources: $NUMBER_OF_INTERFERING_RESOURCES
+    Base Scale per service: $BASE_SCALE
+    Scale-Ups Allowed per service: $SCALE_UPS_ALLOWED
+    ================================================
+    EOF
+    "
+    echo ""
+fi
 
 # Deploy the services
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deploying services..."
@@ -346,7 +361,11 @@ if [ "$BASE_SCALE" -eq 0 ]; then
 fi
 
 # Main test loop
-for i in $(seq 1 "$ITERATIONS"); do
+BASE_ITERATION=1
+if [ "$OFFSET" -gt 0 ]; then
+    BASE_ITERATION=$((OFFSET + 1))
+fi
+for i in $(seq "$BASE_ITERATION" "$ITERATIONS"); do
     echo "------------------------------------------------"
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting test iteration $i of $ITERATIONS"
     echo "------------------------------------------------"
@@ -498,8 +517,8 @@ Target RPS: $TARGET_RPS
 Real RPS: $REAL_RPS
 ================================================
 EOF
-    "
-        kubectl exec "$INVOKER_POD" -- bash -c "mv $INVOKER_PATH/invoker-output.log $RESULTS_DIR/iteration_${i}_invoker-output.log"
+            && mv $INVOKER_PATH/invoker-output.log $SERVICE_PATH/iteration_${i}_invoker-output.log
+        "
     done
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Results saved to $RESULTS_DIR!"
 
