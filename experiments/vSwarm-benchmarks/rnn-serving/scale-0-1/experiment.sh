@@ -302,22 +302,22 @@ if [ "$OFFSET" -eq 0 ]; then
     echo "Saving test configuration..."
     kubectl exec "${INVOKER_POD_BASE_NAME}-1" -- bash -c "
         cat > $RESULTS_DIR/config.txt <<EOF
-    ================================================
-    vSwarm RNN Benchmark - Test Configuration
-    ================================================
-    Experiment Name: $EXPERIMENT_NAME
-    Test Type: $TEST_TYPE
-    Number of Services: $NUMBER_OF_SERVICES
-    RPS per service: $RPS
-    Timeout: $TIMEOUT seconds
-    Duration: $DURATION seconds
-    Iterations: $ITERATIONS
-    Number of Interfering Resources: $NUMBER_OF_INTERFERING_RESOURCES
-    Base Scale per service: $BASE_SCALE
-    Scale-Ups Allowed per service: $SCALE_UPS_ALLOWED
-    ================================================
-    EOF
-    "
+================================================
+vSwarm RNN Benchmark - Test Configuration
+================================================
+Experiment Name: $EXPERIMENT_NAME
+Test Type: $TEST_TYPE
+Number of Services: $NUMBER_OF_SERVICES
+RPS per service: $RPS
+Timeout: $TIMEOUT seconds
+Duration: $DURATION seconds
+Iterations: $ITERATIONS
+Number of Interfering Resources: $NUMBER_OF_INTERFERING_RESOURCES
+Base Scale per service: $BASE_SCALE
+Scale-Ups Allowed per service: $SCALE_UPS_ALLOWED
+================================================
+EOF
+"
     echo ""
 fi
 
@@ -507,6 +507,7 @@ for i in $(seq "$BASE_ITERATION" "$ITERATIONS"); do
         REAL_RPS=$(echo "$INVOKER_OUTPUT" | sed -n 's/.*Real \/ target RPS: \([0-9.]*\) \/ \([0-9.]*\).*/\1/p')
         TARGET_RPS=$(echo "$INVOKER_OUTPUT" | sed -n 's/.*Real \/ target RPS: \([0-9.]*\) \/ \([0-9.]*\).*/\2/p')
         kubectl exec "$INVOKER_POD" -- bash -c "
+            mv $INVOKER_PATH/invoker-output.log $SERVICE_PATH/iteration_${i}_invoker-output.log && \
             cat > $SERVICE_PATH/iteration_${i}_status.txt <<EOF
 ================================================
 vSwarm RNN Benchmark Status - Iteration $i
@@ -517,7 +518,6 @@ Target RPS: $TARGET_RPS
 Real RPS: $REAL_RPS
 ================================================
 EOF
-            && mv $INVOKER_PATH/invoker-output.log $SERVICE_PATH/iteration_${i}_invoker-output.log
         "
     done
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Results saved to $RESULTS_DIR!"
