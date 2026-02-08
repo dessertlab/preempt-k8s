@@ -14,12 +14,13 @@ CREATE="true"
 CRITICAL="true"
 NUMBER_OF_PODS=10
 DESTINATION_PATH="/home"
-INVOKER_BINARY_SOURCE_PATH="./invoker"
+GRPCURL_BINARY_SOURCE_PATH="./grpcurl"
+HELLOWORLD_PROTO_SOURCE_PATH="./helloworld.proto"
 BUCKET_NODE="dessertw4"
 LIST_OF_NON_FEASIBLE_NODES=("dessertw3" "dessertw4")
 
 # Parse command line flags
-while getopts "p:b:g:n:c:d:s:t:l:h" opt; do
+while getopts "p:b:g:n:c:d:s:f:t:l:h" opt; do
     case $opt in
         p) POD_BASE_NAME="$OPTARG" ;;
         b) SERVICE_BASE_NAME="$OPTARG" ;;
@@ -27,7 +28,8 @@ while getopts "p:b:g:n:c:d:s:t:l:h" opt; do
         c) CRITICAL="$OPTARG" ;;
         n) NUMBER_OF_PODS="$OPTARG" ;;
         d) DESTINATION_PATH="$OPTARG" ;;
-        s) INVOKER_BINARY_SOURCE_PATH="$OPTARG" ;;
+        s) GRPCURL_BINARY_SOURCE_PATH="$OPTARG" ;;
+        f) HELLOWORLD_PROTO_SOURCE_PATH="$OPTARG" ;;
         t) BUCKET_NODE="$OPTARG" ;;
         l) IFS=',' read -r -a LIST_OF_NON_FEASIBLE_NODES <<< "$OPTARG" ;;
         h) 
@@ -36,12 +38,13 @@ while getopts "p:b:g:n:c:d:s:t:l:h" opt; do
             echo "Options:"
             echo "  -p <pod-base-name>                      Base name of the pods to create or delete (default: benchmark-pod)"
             echo "  -b <service-base-name>                  Base name of RNN services to create (default: rnn-serving-python)"
-            echo "  -g <create>                             Choose whether to create or delete invoker pods (default: true)"
+            echo "  -g <create>                             Choose whether to create or delete test pods (default: true)"
             echo "  -c <critical>                           Choose if the services rely on RTResources - with criticality level = 1 - or Deployments (default: true)"
-            echo "  -n <number-of-pods>                     Number of invoker pods to create or delete (default: 10)"
-            echo "  -d <destination-path>                   Destination path in for invoker binary and endpoints.json file in the invoker pods (default: /home)"
-            echo "  -s <invoker-binary-source-path>         invoker binary source path on local machine (default: ./invoker)"
-            echo "  -t <bucket-node>                        The two nodes where to schedule the invoker pods (default: dessertw4)"
+            echo "  -n <number-of-pods>                     Number of test pods to create or delete (default: 10)"
+            echo "  -d <destination-path>                   Destination path in for helloworld.proto file in the test pods (default: /home)"
+            echo "  -s <grpcurl-binary-source-path>         grpcurl binary source path on local machine (default: ./grpcurl)"
+            echo "  -f <helloworld-proto-source-path>       helloworld.proto file source path on local machine (default: ./helloworld.proto)"
+            echo "  -t <bucket-node>                        The two nodes where to schedule the test pods (default: dessertw4)"
             echo "  -l <list-of-non-feasible-nodes>         List of nodes where service pods should not be scheduled (default: dessertw3,dessertw4)"
             echo "  -h                                      Show this help message"
             exit 0
@@ -91,12 +94,18 @@ if ! [[ "$NUMBER_OF_PODS" =~ ^[0-9]+$ ]] || [[ "$NUMBER_OF_PODS" -le 0 ]]; then
     exit 1
 fi
 
-# Validate invoker binary source path
-if [[ ! -f "$INVOKER_BINARY_SOURCE_PATH" ]]; then
-    echo "Error: Invoker binary source path '$INVOKER_BINARY_SOURCE_PATH' does not exist or is not a file" >&2
+# Validate grpcurl binary source path
+if [[ ! -f "$GRPCURL_BINARY_SOURCE_PATH" ]]; then
+    echo "Error: grpcurl binary source path '$GRPCURL_BINARY_SOURCE_PATH' does not exist or is not a file" >&2
     exit 1
 else
-    chmod +x "$INVOKER_BINARY_SOURCE_PATH"
+    chmod +x "$GRPCURL_BINARY_SOURCE_PATH"
+fi
+
+# Validate helloworld.proto file source path
+if [[ ! -f "$HELLOWORLD_PROTO_SOURCE_PATH" ]]; then
+    echo "Error: helloworld.proto file source path '$HELLOWORLD_PROTO_SOURCE_PATH' does not exist or is not a file" >&2
+    exit 1
 fi
 
 # Validate bucket node
@@ -117,9 +126,9 @@ for NODE in "${LIST_OF_NON_FEASIBLE_NODES[@]}"; do
     fi
 done
 
-# Create or delete invoker pods
+# Create or delete test pods
 if [[ "$CREATE" == "true" ]]; then
-    echo "Creating $NUMBER_OF_PODS invoker pods with base name '$POD_BASE_NAME'..."
+    echo "Creating $NUMBER_OF_PODS test pods with base name '$POD_BASE_NAME'..."
 
     # Create local Knative Service manifest files
     for i in $(seq 1 "$NUMBER_OF_PODS"); do
@@ -270,7 +279,7 @@ EOF
         fi
     done
 
-    # Create the invoker pods
+    # Create the test pods
     for i in $(seq 1 "$NUMBER_OF_PODS"); do
         POD_NAME="${POD_BASE_NAME}-${i}"
         SERVICE_NAME="${SERVICE_BASE_NAME}-${i}"
@@ -315,41 +324,35 @@ EOF
     done
 
     # Wait for all pods to be in Running state
-    echo "Waiting for invoker pods to be in 'Running' state..."
+    echo "Waiting for test pods to be in 'Running' state..."
     while [ "$(kubectl get pods --no-headers | { grep "^$POD_BASE_NAME" || true; } | { grep "Running" || true; } | wc -l)" -ne "$NUMBER_OF_PODS" ]; do
         sleep 2
     done
-    echo "Invoker pods are running!"
+    echo "test pods are running!"
 
-    # Populate the invoker pods with invoker executable and endpoints.json files
+    # Populate the test pods with grpcurl executable and helloworld.proto files
     for i in $(seq 1 "$NUMBER_OF_PODS"); do
         POD_NAME="${POD_BASE_NAME}-${i}"
         SERVICE_NAME="${SERVICE_BASE_NAME}-${i}"
 
-        # Copy the invoker binary into the pod
-        kubectl cp "$INVOKER_BINARY_SOURCE_PATH" "$POD_NAME:$DESTINATION_PATH/invoker"
+        # Copy the grpcurl binary into the pod
+        kubectl cp "$GRPCURL_BINARY_SOURCE_PATH" "$POD_NAME:/usr/local/bin/grpcurl"
 
-        # Create endpoints.json file inside the pod
-        kubectl exec -i "$POD_NAME" -- bash -c "cat > $DESTINATION_PATH/endpoints.json" <<EOF
-[
-  {
-    "hostname": "$SERVICE_NAME.default.svc.cluster.local"
-  }
-]
-EOF
+        # Create helloworld.proto file inside the pod
+        kubectl cp "$HELLOWORLD_PROTO_SOURCE_PATH" "$POD_NAME:$DESTINATION_PATH/helloworld.proto"
     done
 
-    echo "✓ All $NUMBER_OF_PODS invoker pods created successfully!"
+    echo "✓ All $NUMBER_OF_PODS test pods created successfully!"
 
 elif [[ "$CREATE" == "false" ]]; then
-    echo "Deleting $NUMBER_OF_PODS invoker pods with base name '$POD_BASE_NAME'..."
+    echo "Deleting $NUMBER_OF_PODS test pods with base name '$POD_BASE_NAME'..."
 
     for i in $(seq 1 "$NUMBER_OF_PODS"); do
         POD_NAME="${POD_BASE_NAME}-${i}"
         SERVICE_NAME="${SERVICE_BASE_NAME}-${i}"
         MANIFEST_FILE="./kn-rnn-serving-python-${i}.yaml"
         
-        # Delete the invoker pod
+        # Delete the test pod
         kubectl delete pod "$POD_NAME" --ignore-not-found=true &
         
         # Remove the manifest file
@@ -357,5 +360,5 @@ elif [[ "$CREATE" == "false" ]]; then
     done
     wait
 
-    echo "✓ All $NUMBER_OF_PODS invoker pods deleted successfully!"
+    echo "✓ All $NUMBER_OF_PODS test pods deleted successfully!"
 fi
