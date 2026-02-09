@@ -519,7 +519,7 @@ def main():
 
         if os.path.isdir(service_path):
             all_files = os.listdir(service_path)
-            status_files[service_name] = [f for f in all_files if f.startswith("iteration") and os.path.isfile(os.path.join(service_path, f))]
+            status_files[service_name] = [f for f in all_files if f.endswith("status.txt") and os.path.isfile(os.path.join(service_path, f))]
             rps_files[service_name] = [f for f in all_files if f.startswith("rps") and os.path.isfile(os.path.join(service_path, f))]
     
             status_count = len(status_files[service_name])

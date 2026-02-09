@@ -112,7 +112,7 @@ def process_experiment_data(root_path, num_services, controller_name):
         
         if os.path.isdir(service_path):
             all_files = os.listdir(service_path)
-            status_files[service_name] = sorted([f for f in all_files if f.startswith("iteration") and os.path.isfile(os.path.join(service_path, f))])
+            status_files[service_name] = sorted([f for f in all_files if f.endswith("status.txt") and os.path.isfile(os.path.join(service_path, f))])
             rps_files[service_name] = sorted([f for f in all_files if f.startswith("rps") and os.path.isfile(os.path.join(service_path, f))])
     
     # Collect audit logs files
