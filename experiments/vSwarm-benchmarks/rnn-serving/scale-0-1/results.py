@@ -527,12 +527,12 @@ def main():
             
             print(f"Found {status_count} status files and {rps_count} rps files for {service_name}!")
             
-            if status_count != 5:
-                print(f"Error: Expected exactly 5 status files, but found {status_count} for {service_name}!")
+            if status_count != 30:
+                print(f"Error: Expected exactly 30 status files, but found {status_count} for {service_name}!")
                 sys.exit(1)
             
-            if rps_count != 5:
-                print(f"Error: Expected exactly 5 rps files, but found {rps_count} for {service_name}!")
+            if rps_count != 30:
+                print(f"Error: Expected exactly 30 rps files, but found {rps_count} for {service_name}!")
                 sys.exit(1)
     
     all_audit_files = []
@@ -542,8 +542,8 @@ def main():
 
     print(f"Found {audit_count} audit logs files in total!")
 
-    if audit_count != 5:
-        print(f"Error: Expected exactly 5 audit logs files, but found {audit_count}!")
+    if audit_count != 30:
+        print(f"Error: Expected exactly 30 audit logs files, but found {audit_count}!")
         sys.exit(1)
     
     print("File count validation passed!")
@@ -577,7 +577,7 @@ def main():
         pod_creation_delays = []
         pod_start_delays = []
 
-        for j in range(5):
+        for j in range(30):
             service_id = f"rnn-serving-python-{i+1}"
             service_name = f"service-{i+1}"
             audit_logs_file = os.path.join(root_path, f"loki-logs-iteration_{j+1}.json")
