@@ -15,9 +15,9 @@ spec:
       name: rt-critical-pod
       namespace: realtime
       labels:
-        test-label: rt-critical-label
+        app-selector: rt-critical-app
       annotations:
-        test-annotation: rt-critical-annotation
+        app-annotation: rt-critical-annotation
     spec:
       containers:
         - name: rt-critical-container
