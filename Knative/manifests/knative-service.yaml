@@ -1,0 +1,19 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: service-1
+  namespace: realtime
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/target: "10"
+        autoscaling.knative.dev/metric: "concurrency"
+        autoscaling.knative.dev/max-scale-down-rate: "10.0"
+        autoscaling.knative.dev/scale-to-zero-grace-period: "0s"
+    spec:
+      containers:
+      - image: nginx:latest
+        ports:
+        - containerPort: 80
+          name: http1
