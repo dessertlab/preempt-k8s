@@ -3,6 +3,7 @@ import os
 import json
 import re
 import glob
+import textwrap
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import numpy as np
@@ -247,7 +248,7 @@ def create_scatter_plot(all_experiment_events, output_path, mode, service_name, 
                 y_values, 
                 c=colors[event_type], 
                 marker=markers[event_type],
-                s=100,
+                s=500,
                 alpha=0.9,
                 edgecolors='black',
                 linewidth=0.7,
@@ -282,7 +283,7 @@ def create_scatter_plot(all_experiment_events, output_path, mode, service_name, 
                     [prev_last_point[1], first_point[1]],
                     color=colors[event_type],
                     alpha=0.3,
-                    linewidth=1.5,
+                    linewidth=5,
                     linestyle='--',
                     zorder=2
                 )
@@ -305,10 +306,6 @@ def create_scatter_plot(all_experiment_events, output_path, mode, service_name, 
             # Store last point for connecting to next experiment
             prev_last_point = exp_points_sorted[-1]
     
-    # Configure axes with black text
-    ax.set_xlabel('Time (milliseconds)', fontsize=30, fontweight='bold', color='black')
-    ax.set_ylabel('Experiment Bands', fontsize=30, fontweight='bold', color='black')
-    
     # Set Y-axis ticks and labels for bands
     band_ticks = [i + 0.5 for i in range(num_bands)]
     band_labels = []
@@ -316,53 +313,51 @@ def create_scatter_plot(all_experiment_events, output_path, mode, service_name, 
         start_exp = i * experiments_per_band + 1
         end_exp = min((i + 1) * experiments_per_band, total_experiments)
         if start_exp == end_exp:
-            band_labels.append(f"Exp {start_exp}")
+            band_labels.append(f"{start_exp}")
         else:
-            band_labels.append(f"Exp {start_exp}-{end_exp}")
+            band_labels.append(f"{start_exp}-{end_exp}")
     
     ax.set_yticks(band_ticks)
-    ax.set_yticklabels(band_labels, fontsize=24, color='black')
+    ax.set_yticklabels(band_labels, fontsize=40, color='black')
     ax.set_ylim(-0.1, num_bands + 0.1)
     
     # Customize tick colors
-    ax.tick_params(axis='x', colors='black', labelsize=24)
-    ax.tick_params(axis='y', colors='black', labelsize=24)
+    ax.tick_params(axis='x', colors='black', labelsize=40)
+    ax.tick_params(axis='y', colors='black', labelsize=40)
     
-    # Format X-axis to avoid scientific notation
+    # Format X-axis to show seconds with 's' suffix
     from matplotlib.ticker import FuncFormatter
     def format_func(value, tick_number):
-        return f'{int(value)}'
+        return f'{int(value)}s'
     ax.xaxis.set_major_formatter(FuncFormatter(format_func))
     
     # Add horizontal grid lines for each band (lighter for visibility)
     for i in range(num_bands + 1):
         ax.axhline(y=i, color='#CCCCCC', linestyle='--', alpha=0.6, linewidth=1, zorder=1)
     
-    # Set title with black color
-    mode_title = "Kube Manager" if mode == 'kube-manager' else "Preempt-K8s"
-    ax.set_title(f'Event Timeline - {mode_title} - Service: {service_name}\n({total_experiments} experiments)', 
-                 fontsize=28, fontweight='bold', pad=20, color='black')
-    
     # Create legend with bright colors
+    # Set max width for legend labels (in characters)
+    max_label_width = 20
+    
     if mode == 'kube-manager':
         # For kube-manager, starts_processing and pod_created are collapsed
         legend_elements = [
-            mpatches.Patch(color=colors['scale-up'], label='Scale-up'),
-            mpatches.Patch(color=colors['starts_processing'], label='Starts Processing / Pod Created'),
-            mpatches.Patch(color=colors['pod_started'], label='Pod Started')
+            mpatches.Patch(color=colors['scale-up'], label=textwrap.fill('Scale-up', max_label_width)),
+            mpatches.Patch(color=colors['starts_processing'], label=textwrap.fill('Starts Processing / Pod Created', max_label_width)),
+            mpatches.Patch(color=colors['pod_started'], label=textwrap.fill('Pod Started', max_label_width))
         ]
     else:
         legend_elements = [
-            mpatches.Patch(color=colors['scale-up'], label='Scale-up'),
-            mpatches.Patch(color=colors['starts_processing'], label='Starts Processing'),
-            mpatches.Patch(color=colors['pod_created'], label='Pod Created'),
-            mpatches.Patch(color=colors['pod_started'], label='Pod Started')
+            mpatches.Patch(color=colors['scale-up'], label=textwrap.fill('Scale-up', max_label_width)),
+            mpatches.Patch(color=colors['starts_processing'], label=textwrap.fill('Starts Processing', max_label_width)),
+            mpatches.Patch(color=colors['pod_created'], label=textwrap.fill('Pod Created', max_label_width)),
+            mpatches.Patch(color=colors['pod_started'], label=textwrap.fill('Pod Started', max_label_width))
         ]
     
     legend = ax.legend(
         handles=legend_elements,
-        loc='upper right',
-        fontsize=22,
+        loc='lower right',
+        fontsize=30,
         framealpha=0.95,
         edgecolor='black',
         facecolor='white'
@@ -619,22 +614,22 @@ def generate_event_scatter_plot(experiment_path, output_path, audit_files, contr
                 # Use starts_processing timestamp (which is same as pod_created)
                 events.append({
                     'type': 'starts_processing',
-                    'timestamp': (metrics['starts_processing_timestamp'] - scale_up_ts) / 1_000_000  # Convert to milliseconds
+                    'timestamp': (metrics['starts_processing_timestamp'] - scale_up_ts) / 1_000_000_000  # Convert to seconds
                 })
             else:
                 # For preempt-k8s, keep them separate
                 events.append({
                     'type': 'starts_processing',
-                    'timestamp': (metrics['starts_processing_timestamp'] - scale_up_ts) / 1_000_000  # Convert to milliseconds
+                    'timestamp': (metrics['starts_processing_timestamp'] - scale_up_ts) / 1_000_000_000  # Convert to seconds
                 })
                 events.append({
                     'type': 'pod_created',
-                    'timestamp': (metrics['pod_created_timestamp'] - scale_up_ts) / 1_000_000  # Convert to milliseconds
+                    'timestamp': (metrics['pod_created_timestamp'] - scale_up_ts) / 1_000_000_000  # Convert to seconds
                 })
             
             events.append({
                 'type': 'pod_started',
-                'timestamp': (metrics['pod_started_timestamp'] - scale_up_ts) / 1_000_000  # Convert to milliseconds
+                'timestamp': (metrics['pod_started_timestamp'] - scale_up_ts) / 1_000_000_000  # Convert to seconds
             })
             
             # Add to list with zero-based index for plotting
