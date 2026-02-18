@@ -400,7 +400,7 @@ for i in $(seq "$BASE_ITERATION" "$ITERATIONS"); do
     START_TIME=$(date +%s%N)
     sleep 20
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting benchmark..."
-    INVOKER_CMD="cd $INVOKER_PATH && ./invoker -port 80 -time $DURATION -rps $RPS --grpcTimeout $TIMEOUT -latf iteration_${i} > ./invoker-output.log"
+    INVOKER_CMD="cd $INVOKER_PATH && ./invoker -port $SERVICE_PORT -time $DURATION -rps $RPS --grpcTimeout $TIMEOUT -latf iteration_${i} > ./invoker-output.log"
     for j in $(seq 1 "$NUMBER_OF_SERVICES"); do
         INVOKER_POD="${INVOKER_POD_BASE_NAME}-$j"
         kubectl exec "$INVOKER_POD" -- bash -c "$INVOKER_CMD" > /dev/null 2>&1 &
