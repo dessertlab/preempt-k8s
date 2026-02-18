@@ -26,7 +26,7 @@ BASE_SCALE="0"
 SCALE_UPS_ALLOWED="1"
 LOKI_NAMESPACE="observability"
 LOKI_NAME="loki-0"
-LOKI_IP_ADDRESS="10.244.1.216"
+LOKI_IP_ADDRESS="10.244.1.177"
 LOKI_FLUSH="false"
 FORCE_CLEANUP="true"
 
@@ -147,7 +147,7 @@ if ! [[ "$SERVICE_PORT" =~ ^[0-9]+$ ]] || [[ "$SERVICE_PORT" -lt 1 ]]; then
 fi
 
 # Validate RPS is a positive number
-if ! [[ "$RPS" =~ ^[0-9]+$ ]] || [[ "$RPS" -lt 1 ]]; then
+if ! [[ "$RPS" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
     echo "Error: RPS must be a positive number (got: $RPS)" >&2
     exit 1
 fi
