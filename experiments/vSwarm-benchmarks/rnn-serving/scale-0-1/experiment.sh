@@ -26,7 +26,7 @@ BASE_SCALE="0"
 SCALE_UPS_ALLOWED="1"
 LOKI_NAMESPACE="observability"
 LOKI_NAME="loki-0"
-LOKI_IP_ADDRESS="10.244.1.222"
+LOKI_IP_ADDRESS="10.244.1.36"
 LOKI_FLUSH="false"
 FORCE_CLEANUP="true"
 
@@ -520,6 +520,17 @@ Real RPS: $REAL_RPS
 EOF
         "
     done
+
+    # Page cache flush on all nodes to minimize the effect of caching on subsequent iterations
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Flushing page cache on all nodes..."
+
+    sync; echo 3 | sudo tee /proc/sys/vm/drop_caches >/dev/null 2>&1
+    ssh root@192.168.100.22 "sync; echo 3 | sudo tee /proc/sys/vm/drop_caches" >/dev/null 2>&1
+    ssh root@192.168.100.23 "sync; echo 3 | sudo tee /proc/sys/vm/drop_caches" >/dev/null 2>&1
+    ssh root@192.168.100.24 "sync; echo 3 | sudo tee /proc/sys/vm/drop_caches" >/dev/null 2>&1
+    ssh root@192.168.100.53 "sync; echo 3 | sudo tee /proc/sys/vm/drop_caches" >/dev/null 2>&1
+
+    # Iteration completed, results saved
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Results saved to $RESULTS_DIR!"
 
     echo "------------------------------------------------"
