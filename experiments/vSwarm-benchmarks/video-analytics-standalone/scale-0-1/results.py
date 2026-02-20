@@ -332,7 +332,7 @@ def parse_audit_logs_file(file_path, controller, service):
                 continue
 
             if 'scale_up_timestamp' in service_metrics:
-                raise ValueError(f"Duplicate scale-up event for {service_name}")
+                raise ValueError(f"Duplicate scale-up event for {service_name} in audit logs file {file_path}")
             service_metrics['scale_up_timestamp'] = int(entry.get('timestamp', '0'))
 
             print(f"  Scale-up event for {service_name} at timestamp {service_metrics['scale_up_timestamp']}")
@@ -348,7 +348,7 @@ def parse_audit_logs_file(file_path, controller, service):
                 continue
             
             if 'starts_processing_timestamp' in service_metrics:
-                raise ValueError(f"Duplicate starts_processing event for {service_name}")
+                raise ValueError(f"Duplicate starts_processing event for {service_name} in audit logs file {file_path}")
             service_metrics['starts_processing_timestamp'] = int(entry.get('timestamp', '0'))
 
             print(f"  Starts processing event for {service_name} at timestamp {service_metrics['starts_processing_timestamp']}")
@@ -371,11 +371,11 @@ def parse_audit_logs_file(file_path, controller, service):
             
             if controller == "kube-manager":
                 if 'starts_processing_timestamp' in service_metrics:
-                    raise ValueError(f"Duplicate starts_processing event for {service_name}")
+                    raise ValueError(f"Duplicate starts_processing event for {service_name} in audit logs file {file_path}")
                 service_metrics['starts_processing_timestamp'] = int(entry.get('timestamp', '0'))
             
             if 'pod_created_timestamp' in service_metrics:
-                    raise ValueError(f"Duplicate pod_created event for {service_name}")
+                    raise ValueError(f"Duplicate pod_created event for {service_name} in audit logs file {file_path}")
             service_metrics['pod_created_timestamp'] = int(entry.get('timestamp', '0'))
 
             print(f"  Pod created event for {service_name} at timestamp {service_metrics['pod_created_timestamp']}")
@@ -398,7 +398,7 @@ def parse_audit_logs_file(file_path, controller, service):
                 continue
             
             if 'pod_started_timestamp' in service_metrics:
-                raise ValueError(f"Duplicate pod_started event for {service_name}")
+                raise ValueError(f"Duplicate pod_started event for {service_name} in audit logs file {file_path}")
             service_metrics['pod_started_timestamp'] = int(entry.get('timestamp', '0'))
 
             print(f"  Pod started event for {service_name} at timestamp {service_metrics['pod_started_timestamp']}")
@@ -414,7 +414,7 @@ def parse_audit_logs_file(file_path, controller, service):
     ]
     for key in required_keys:
         if key not in service_metrics or service_metrics[key] <= 0:
-            raise ValueError(f"Missing or invalid event {key} for service {service_name} in audit logs")
+            raise ValueError(f"Missing or invalid event {key} for service {service_name} in audit logs file {file_path}")
     
     return service_metrics
                     
