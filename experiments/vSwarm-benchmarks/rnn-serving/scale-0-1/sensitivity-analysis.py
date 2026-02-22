@@ -1,5 +1,6 @@
 import os
 import sys
+from matplotlib.ticker import FuncFormatter
 import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
@@ -10,11 +11,11 @@ from results import (
 )
 
 
-def save_comparative_boxplot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30, 
-                            data_km_45, data_pk8s_45, title, ylabel, filename, directory):
+def save_comparative_boxplot(data_km_100, data_pk8s_100, data_km_120, data_pk8s_120, 
+                            data_km_150, data_pk8s_150, filename, directory):
     """
     Create a sensitivity analysis boxplot with 6 boxes (3 parameter values x 2 controllers).
-    Shows how metrics vary with parameter values (15, 30, 45) for both controllers.
+    Shows how metrics vary with parameter values (100, 120, 150) for both controllers.
     """
     # Set professional style
     plt.rcParams['font.family'] = 'sans-serif'
@@ -23,7 +24,15 @@ def save_comparative_boxplot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30,
     fig, ax = plt.subplots(figsize=(14, 7), constrained_layout=True)
     
     # Prepare data - 6 boxes grouped by parameter value
-    all_data = [data_km_15, data_pk8s_15, data_km_30, data_pk8s_30, data_km_45, data_pk8s_45]
+    # Converti i dati da ms a secondi
+    all_data = [
+        np.array(data_km_100) / 1000.0,
+        np.array(data_pk8s_100) / 1000.0,
+        np.array(data_km_120) / 1000.0,
+        np.array(data_pk8s_120) / 1000.0,
+        np.array(data_km_150) / 1000.0,
+        np.array(data_pk8s_150) / 1000.0
+    ]
     positions = [1, 2, 4, 5, 7, 8]  # Grouped positions
     
     # Scientific colorblind-friendly palette
@@ -32,9 +41,9 @@ def save_comparative_boxplot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30,
     colors = [color_km, color_pk8s, color_km, color_pk8s, color_km, color_pk8s]
     
     # Add colored background for parameter groups (gradient based on interfering resources)
-    ax.axvspan(0.5, 3, facecolor='#FFE680', alpha=0.5, zorder=0)      # Yellow for 15 (low interference)
-    ax.axvspan(3, 6, facecolor='#FFB366', alpha=0.5, zorder=0)        # Orange for 30 (medium interference)
-    ax.axvspan(6, 9, facecolor='#FF8FA3', alpha=0.5, zorder=0)        # Pink for 45 (high interference)
+    ax.axvspan(0.5, 3, facecolor='#FFE680', alpha=0.5, zorder=0)      # Yellow for 100 (low interference)
+    ax.axvspan(3, 6, facecolor='#FFB366', alpha=0.5, zorder=0)        # Orange for 120 (medium interference)
+    ax.axvspan(6, 9, facecolor='#FF8FA3', alpha=0.5, zorder=0)        # Pink for 150 (high interference)
     
     # Create boxplot with refined styling and prominent red outliers
     bp = ax.boxplot(all_data, positions=positions, widths=0.7, patch_artist=True,
@@ -63,9 +72,9 @@ def save_comparative_boxplot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30,
         cap.set_alpha(0.6)
     
     # Set two-level x-axis labels
-    ax.set_xticks(positions)
-    labels_controller = ['KM', 'PK8s', 'KM', 'PK8s', 'KM', 'PK8s']
-    ax.set_xticklabels(labels_controller, fontsize=13)
+    # ax.set_xticks(positions)
+    # labels_controller = ['Vanilla K8s', 'Preempt-K8s', 'Vanilla K8s', 'Preempt-K8s', 'Vanilla K8s', 'Preempt-K8s']
+    # ax.set_xticklabels(labels_controller, fontsize=20, fontweight='semibold')
     
     # Add vertical separator lines
     ax.axvline(x=3, color='#CCCCCC', linestyle='-', linewidth=1.5, alpha=0.6)
@@ -82,131 +91,176 @@ def save_comparative_boxplot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30,
     ax.spines['bottom'].set_linewidth(1.2)
     
     # Labels with improved typography
-    ax.set_xlabel('Controller Type (15 | 30 | 45 Interfering Resources)', fontsize=14, fontweight='semibold', labelpad=10)
-    ax.set_ylabel(ylabel, fontsize=14, fontweight='semibold', labelpad=10)
-    ax.set_title(title, fontsize=16, fontweight='bold', pad=20)
+    # ax.set_ylabel(ylabel, fontsize=14, fontweight='semibold', labelpad=10)
     
     # Add legend
     from matplotlib.patches import Patch
     legend_elements = [
-        Patch(facecolor=color_km, edgecolor=color_km, alpha=0.7, label='Kube-Manager'),
+        Patch(facecolor=color_km, edgecolor=color_km, alpha=0.7, label='Vanilla K8s'),
         Patch(facecolor=color_pk8s, edgecolor=color_pk8s, alpha=0.7, label='Preempt-K8s')
     ]
-    ax.legend(handles=legend_elements, loc='upper right', fontsize=12, framealpha=0.95,
-              edgecolor='gray', fancybox=True)
+    ax.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(1.05, 0.92),
+              prop={'size': 20, 'weight': 'semibold'}, framealpha=0.95, edgecolor='gray', fancybox=True)
     
     # Adjust tick label sizes
-    ax.tick_params(axis='both', which='major', labelsize=12)
+    ax.tick_params(axis='x', which='both', bottom=False, labelbottom=False)   # Remove x-axis ticks
+    ax.tick_params(axis='y', which='major', labelsize=30)  # Set y-axis tick label size
+    for label in ax.get_yticklabels():
+        label.set_fontweight('semibold')
+    
+    # Format y-axis in seconds (no division by 1000 needed)
+    ax.yaxis.set_major_formatter(FuncFormatter(lambda x, p: f'{x:.2f}'))
     
     # Add parameter group labels as text annotations at the top of each group
     y_pos = ax.get_ylim()[1] * 0.98  # Near top of plot
-    ax.text(1.5, y_pos, '15', ha='center', va='top', 
-            fontsize=13, fontweight='bold',
+    ax.text(1.5, y_pos, '100', ha='center', va='top', 
+            fontsize=25, fontweight='bold',
             bbox=dict(boxstyle='round,pad=0.4', facecolor='white', edgecolor='gray', alpha=0.9, linewidth=1.5))
-    ax.text(4.5, y_pos, '30', ha='center', va='top', 
-            fontsize=13, fontweight='bold',
+    ax.text(4.5, y_pos, '120', ha='center', va='top', 
+            fontsize=25, fontweight='bold',
             bbox=dict(boxstyle='round,pad=0.4', facecolor='white', edgecolor='gray', alpha=0.9, linewidth=1.5))
-    ax.text(7.5, y_pos, '45', ha='center', va='top', 
-            fontsize=13, fontweight='bold',
+    ax.text(7.5, y_pos, '150', ha='center', va='top', 
+            fontsize=25, fontweight='bold',
             bbox=dict(boxstyle='round,pad=0.4', facecolor='white', edgecolor='gray', alpha=0.9, linewidth=1.5))
     
     # Save as PNG
     plot_path_png = os.path.join(directory, filename)
     plt.savefig(plot_path_png, dpi=300, bbox_inches='tight', facecolor='white')
     plt.close()
-    print(f"{title} saved to: {plot_path_png}")
+    print(f"Box-Plot saved to: {plot_path_png}")
 
 
-def save_comparative_cdf_plot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30,
-                             data_km_45, data_pk8s_45, title, xlabel, filename, directory):
+def save_comparative_cdf_plot(data_km_100, data_pk8s_100, data_km_120, data_pk8s_120,
+                             data_km_150, data_pk8s_150, filename, directory):
     """
     Create sensitivity analysis CDF plots with 6 lines (3 parameter values x 2 controllers).
-    Shows how CDFs vary with parameter values (15, 30, 45) for both controllers.
+    Shows how CDFs vary with parameter values (100, 120, 150) for both controllers.
     """
     # Set professional style
     plt.rcParams['font.family'] = 'sans-serif'
     plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial', 'Helvetica']
     
-    fig, ax = plt.subplots(figsize=(14, 8), constrained_layout=True)
+    # 3 horizontal bands (shared x, independent y scale but fixed 0–1)
+    fig, axes = plt.subplots(3, 1, figsize=(14, 12), sharex=True, constrained_layout=True)
     
     # Scientific colorblind-friendly palette
-    color_km = '#0173B2'    # Blue for kube-manager
-    color_pk8s = '#29A329'  # Green for preempt-k8s (not too bright)
+    color_km = '#42a5f5'   # Blue for kube-manager
+    color_pk8s = '#FF8000'  # Orange for preempt-k8s (not too bright)
     
     # Define markers for key percentiles
-    markers = ['o', 's', '^']  # Circle, square, triangle for 15, 30, 45
-    
-    # Define configs with improved styling
+    marker_km = '^'
+    marker_pk8s = 's'
+
     configs = [
-        (data_km_15, 'KM-15', color_km, '-', markers[0]),
-        (data_pk8s_15, 'PK8s-15', color_pk8s, '-', markers[0]),
-        (data_km_30, 'KM-30', color_km, '--', markers[1]),
-        (data_pk8s_30, 'PK8s-30', color_pk8s, '--', markers[1]),
-        (data_km_45, 'KM-45', color_km, ':', markers[2]),
-        (data_pk8s_45, 'PK8s-45', color_pk8s, ':', markers[2])
+        (axes[0], data_km_100, data_pk8s_100, "100", '#FFE680'),
+        (axes[1], data_km_120, data_pk8s_120, "120", '#FFB366'),
+        (axes[2], data_km_150, data_pk8s_150, "150", '#FF8FA3'),
     ]
     
     # Plot CDFs with markers at key percentiles
-    for data, label, color, linestyle, marker in configs:
-        sorted_data = np.sort(data)
-        if len(sorted_data) > 0:
-            cdf = np.arange(1, len(sorted_data) + 1) / len(sorted_data)
-            
-            # Plot main line
-            ax.plot(sorted_data, cdf, 
-                    label=label, 
-                    color=color, 
-                    linestyle=linestyle, 
-                    linewidth=2.8,
-                    alpha=0.9)
-            
-            # Add markers at key percentiles (25%, 50%, 75%, 95%)
-            percentiles = [0.25, 0.50, 0.75, 0.95]
-            for p in percentiles:
-                idx = int(p * len(sorted_data))
-                if idx < len(sorted_data):
-                    ax.plot(sorted_data[idx], cdf[idx], 
-                            marker=marker, 
-                            markersize=8, 
-                            color=color,
-                            markeredgecolor='white',
-                            markeredgewidth=1.5,
-                            zorder=5)
-    
-    # Professional grid styling
-    ax.grid(True, linestyle='--', alpha=0.25, linewidth=0.8, color='#888888')
-    ax.set_axisbelow(True)
-    
-    # Remove top and right spines
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['left'].set_linewidth(1.2)
-    ax.spines['bottom'].set_linewidth(1.2)
-    
-    # Labels with improved typography
-    ax.set_xlabel(xlabel, fontsize=14, fontweight='semibold', labelpad=10)
-    ax.set_ylabel('Cumulative Distribution Function', fontsize=14, fontweight='semibold', labelpad=10)
-    ax.set_title(title, fontsize=16, fontweight='bold', pad=20)
-    
-    # Improved legend
-    ax.legend(loc='lower right', fontsize=11, ncol=2, framealpha=0.95,
-              edgecolor='gray', fancybox=True, columnspacing=1.5)
-    
-    # Set y-axis limits to [0, 1] for proper CDF display
-    ax.set_ylim([0, 1.02])
-    
-    # Adjust tick label sizes
-    ax.tick_params(axis='both', which='major', labelsize=12)
-    
-    # Add horizontal reference lines at key percentiles
-    for p in [0.25, 0.5, 0.75, 0.95]:
-        ax.axhline(y=p, color='#DDDDDD', linestyle=':', linewidth=1, alpha=0.5, zorder=0)
-    
-    # Save as PNG
+    for ax, data_km, data_pk8s, label, bg_color in configs:
+
+        # Background band (like boxplot logic but horizontal)
+        ax.set_facecolor(bg_color)
+        ax.patch.set_alpha(0.35)
+
+        for data, name, color, marker in [
+            (data_km, "Vanilla K8s", color_km, marker_km),
+            (data_pk8s, "Preempt-K8s", color_pk8s, marker_pk8s)
+        ]:
+
+            sorted_data = np.sort(data)
+            if len(sorted_data) > 0:
+                cdf = np.arange(1, len(sorted_data) + 1) / len(sorted_data)
+
+                # Plot main CDF line
+                ax.plot(sorted_data, cdf,
+                        label=name,
+                        color=color,
+                        linewidth=2.8,
+                        alpha=0.95)
+
+                # Add markers at key percentiles
+                percentiles = [0.25, 0.50, 0.75, 0.95]
+                for p in percentiles:
+                    idx = int(p * len(sorted_data))
+                    if idx < len(sorted_data):
+                        ax.plot(sorted_data[idx],
+                                cdf[idx],
+                                marker=marker,
+                                markersize=9,
+                                color=color,
+                                markeredgecolor='white',
+                                markeredgewidth=1.5,
+                                zorder=5)
+
+        # Parameter label inside subplot
+        ax.text(0.98, 0.20, f"{label}",
+        ha='right', va='top',
+        fontsize=25, fontweight='bold',
+        bbox=dict(boxstyle='round,pad=0.4',
+                  facecolor='white',
+                  edgecolor='gray',
+                  alpha=0.9,
+                  linewidth=1.5),
+        transform=ax.transAxes)
+
+        # Professional styling
+        ax.grid(True, linestyle='--', alpha=0.25, linewidth=0.8, color='#888888')
+        ax.set_ylim([0, 1.02])
+        ax.set_yticks([0, 0.5, 1.0])
+        ax.tick_params(axis='y', which='major', labelsize=25)
+        ax.tick_params(axis='x', which='major', labelsize=30)
+        for label in ax.get_yticklabels():
+            label.set_fontweight('semibold')
+        for label in ax.get_xticklabels():
+            label.set_fontweight('semibold')
+
+        # Remove top/right spines
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_linewidth(1.2)
+        ax.spines['bottom'].set_linewidth(1.2)
+
+    # Shared labels
+    axes[-1].xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f'{x/1000:.2f}'))
+
+    # Add legend
+    from matplotlib.lines import Line2D
+
+    legend_elements = [
+        Line2D([0], [0],
+            color=color_km,
+            lw=2.8,
+            marker='^',
+            markersize=9,
+            markeredgecolor='white',
+            markeredgewidth=1.5,
+            label='Vanilla K8s'),
+
+        Line2D([0], [0],
+            color=color_pk8s,
+            lw=2.8,
+            marker='s',
+            markersize=9,
+            markeredgecolor='white',
+            markeredgewidth=1.5,
+            label='Preempt-K8s')
+    ]
+    fig.legend(handles=legend_elements,
+           loc='upper right',
+           bbox_to_anchor=(0.98, 0.98),
+           ncol=1,
+           prop={'size': 20, 'weight': 'semibold'},
+           framealpha=0.95,
+           edgecolor='gray',
+           fancybox=True)
+
     plot_path_png = os.path.join(directory, filename)
     plt.savefig(plot_path_png, dpi=300, bbox_inches='tight', facecolor='white')
     plt.close()
-    print(f"{title} saved to: {plot_path_png}")
+
+    print(f"CDF Plot saved to: {plot_path_png}")
 
 
 def process_experiment_data(root_path, num_services, controller_name):
@@ -362,42 +416,42 @@ def main():
         print(
             "Usage: " \
             "python aggregated-results.py " \
-            "<path_to_kube_manager_15_results> <path_to_kube_manager_30_results> <path_to_kube_manager_45_results> " \
-            "<path_to_preempt_k8s_15_results> <path_to_preempt_k8s_30_results> <path_to_preempt_k8s_45_results> " \
+            "<path_to_kube_manager_100_results> <path_to_kube_manager_120_results> <path_to_kube_manager_150_results> " \
+            "<path_to_preempt_k8s_100_results> <path_to_preempt_k8s_120_results> <path_to_preempt_k8s_150_results> " \
             "<number_of_services>")
         sys.exit(1)
     
-    km_path_15 = sys.argv[1]
-    km_path_30 = sys.argv[2]
-    km_path_45 = sys.argv[3]
-    pk8s_path_15 = sys.argv[4]
-    pk8s_path_30 = sys.argv[5]
-    pk8s_path_45 = sys.argv[6]
+    km_path_100 = sys.argv[1]
+    km_path_120 = sys.argv[2]
+    km_path_150 = sys.argv[3]
+    pk8s_path_100 = sys.argv[4]
+    pk8s_path_120 = sys.argv[5]
+    pk8s_path_150 = sys.argv[6]
     num_services = int(sys.argv[7])
     
     # Validate paths
-    if not os.path.isdir(km_path_15):
-        print(f"Error: {km_path_15} is not a valid directory!")
+    if not os.path.isdir(km_path_100):
+        print(f"Error: {km_path_100} is not a valid directory!")
         sys.exit(1)
     
-    if not os.path.isdir(km_path_30):
-        print(f"Error: {km_path_30} is not a valid directory!")
+    if not os.path.isdir(km_path_120):
+        print(f"Error: {km_path_120} is not a valid directory!")
         sys.exit(1)
     
-    if not os.path.isdir(km_path_45):
-        print(f"Error: {km_path_45} is not a valid directory!")
+    if not os.path.isdir(km_path_150):
+        print(f"Error: {km_path_150} is not a valid directory!")
         sys.exit(1)
     
-    if not os.path.isdir(pk8s_path_15):
-        print(f"Error: {pk8s_path_15} is not a valid directory!")
+    if not os.path.isdir(pk8s_path_100):
+        print(f"Error: {pk8s_path_100} is not a valid directory!")
         sys.exit(1)
     
-    if not os.path.isdir(pk8s_path_30):
-        print(f"Error: {pk8s_path_30} is not a valid directory!")
+    if not os.path.isdir(pk8s_path_120):
+        print(f"Error: {pk8s_path_120} is not a valid directory!")
         sys.exit(1)
     
-    if not os.path.isdir(pk8s_path_45):
-        print(f"Error: {pk8s_path_45} is not a valid directory!")
+    if not os.path.isdir(pk8s_path_150):
+        print(f"Error: {pk8s_path_150} is not a valid directory!")
         sys.exit(1)
     
     if num_services <= 0:
@@ -413,12 +467,12 @@ def main():
         print(f"Output directory already exists: {output_dir}")
     
     # Process all 6 experiments
-    km_data_15 = process_experiment_data(km_path_15, num_services, "kube-manager")
-    km_data_30 = process_experiment_data(km_path_30, num_services, "kube-manager")
-    km_data_45 = process_experiment_data(km_path_45, num_services, "kube-manager")
-    pk8s_data_15 = process_experiment_data(pk8s_path_15, num_services, "preempt-k8s")
-    pk8s_data_30 = process_experiment_data(pk8s_path_30, num_services, "preempt-k8s")
-    pk8s_data_45 = process_experiment_data(pk8s_path_45, num_services, "preempt-k8s")
+    km_data_100 = process_experiment_data(km_path_100, num_services, "kube-manager")
+    km_data_120 = process_experiment_data(km_path_120, num_services, "kube-manager")
+    km_data_150 = process_experiment_data(km_path_150, num_services, "kube-manager")
+    pk8s_data_100 = process_experiment_data(pk8s_path_100, num_services, "preempt-k8s")
+    pk8s_data_120 = process_experiment_data(pk8s_path_120, num_services, "preempt-k8s")
+    pk8s_data_150 = process_experiment_data(pk8s_path_150, num_services, "preempt-k8s")
     
     # Create sensitivity analysis box plots
     print("\n" + "="*60)
@@ -438,10 +492,10 @@ def main():
     
     for metric_key, title, ylabel, fname in box_plots_config:
         save_comparative_boxplot(
-            km_data_15[metric_key], pk8s_data_15[metric_key],
-            km_data_30[metric_key], pk8s_data_30[metric_key],
-            km_data_45[metric_key], pk8s_data_45[metric_key],
-            title, ylabel, fname, str(output_dir)
+            km_data_100[metric_key], pk8s_data_100[metric_key],
+            km_data_120[metric_key], pk8s_data_120[metric_key],
+            km_data_150[metric_key], pk8s_data_150[metric_key],
+            fname, str(output_dir)
         )
     
     # Create sensitivity analysis CDF plots
@@ -459,10 +513,10 @@ def main():
     
     for metric_key, title, xlabel, fname in cdf_plots_config:
         save_comparative_cdf_plot(
-            km_data_15[metric_key], pk8s_data_15[metric_key],
-            km_data_30[metric_key], pk8s_data_30[metric_key],
-            km_data_45[metric_key], pk8s_data_45[metric_key],
-            title, xlabel, fname, str(output_dir)
+            km_data_100[metric_key], pk8s_data_100[metric_key],
+            km_data_120[metric_key], pk8s_data_120[metric_key],
+            km_data_150[metric_key], pk8s_data_150[metric_key],
+            fname, str(output_dir)
         )
     
     print("\n" + "="*60)

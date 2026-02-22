@@ -26,7 +26,7 @@ BASE_SCALE="0"
 SCALE_UPS_ALLOWED="1"
 LOKI_NAMESPACE="observability"
 LOKI_NAME="loki-0"
-LOKI_IP_ADDRESS="10.244.1.36"
+LOKI_IP_ADDRESS="10.244.1.207"
 LOKI_FLUSH="false"
 FORCE_CLEANUP="true"
 
@@ -76,7 +76,7 @@ while getopts "f:t:i:e:c:m:p:q:o:d:n:g:s:r:b:u:l:v:a:k:w:h" opt; do
             echo "  -u <scale-ups-allowed>              Number of allowed scale-up pods per service (default: 1)"
             echo "  -l <loki-namespace>                 Namespace where the Loki instance is deployed (default: observability)"
             echo "  -v <loki-name>                      Name of the Loki pod (default: loki-0)"
-            echo "  -a <loki-ip-address>                IP address of the Loki instance to query for control plane logs (default: 10.244.1.222)"
+            echo "  -a <loki-ip-address>                IP address of the Loki instance to query for control plane logs (default: 10.244.1.207)"
             echo "  -k <loki-flush>                     Whether to flush Loki logs before each iteration (default: false)"
             echo "  -w <force-cleanup>                  Force cleanup of tested services' resources after test, use when pods require too much time to terminate (default: true)"
             echo "  -h                                  Show this help message"
@@ -398,7 +398,7 @@ for i in $(seq "$BASE_ITERATION" "$ITERATIONS"); do
     # We start the benchmark
     PIDS=()
     START_TIME=$(date +%s%N)
-    sleep 20
+    # sleep 20
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting benchmark..."
     INVOKER_CMD="cd $INVOKER_PATH && ./invoker -port $SERVICE_PORT -time $DURATION -rps $RPS --grpcTimeout $TIMEOUT -latf iteration_${i} > ./invoker-output.log"
     for j in $(seq 1 "$NUMBER_OF_SERVICES"); do
