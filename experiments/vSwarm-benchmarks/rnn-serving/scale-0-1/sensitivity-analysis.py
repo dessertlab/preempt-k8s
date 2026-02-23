@@ -11,11 +11,12 @@ from results import (
 )
 
 
-def save_comparative_boxplot(data_km_100, data_pk8s_100, data_km_120, data_pk8s_120, 
-                            data_km_150, data_pk8s_150, filename, directory):
+def save_comparative_boxplot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30, 
+                            data_km_45, data_pk8s_45, filename, directory,
+                            scale_factor=1000.0):
     """
     Create a sensitivity analysis boxplot with 6 boxes (3 parameter values x 2 controllers).
-    Shows how metrics vary with parameter values (100, 120, 150) for both controllers.
+    Shows how metrics vary with parameter values (15, 30, 45) for both controllers.
     """
     # Set professional style
     plt.rcParams['font.family'] = 'sans-serif'
@@ -25,13 +26,14 @@ def save_comparative_boxplot(data_km_100, data_pk8s_100, data_km_120, data_pk8s_
     
     # Prepare data - 6 boxes grouped by parameter value
     # Converti i dati da ms a secondi
+    # Scale data according to provided scale_factor (e.g., 1000.0 to convert ms->s, 1.0 to keep counts/RPS)
     all_data = [
-        np.array(data_km_100) / 1000.0,
-        np.array(data_pk8s_100) / 1000.0,
-        np.array(data_km_120) / 1000.0,
-        np.array(data_pk8s_120) / 1000.0,
-        np.array(data_km_150) / 1000.0,
-        np.array(data_pk8s_150) / 1000.0
+        np.array(data_km_15) / scale_factor,
+        np.array(data_pk8s_15) / scale_factor,
+        np.array(data_km_30) / scale_factor,
+        np.array(data_pk8s_30) / scale_factor,
+        np.array(data_km_45) / scale_factor,
+        np.array(data_pk8s_45) / scale_factor
     ]
     positions = [1, 2, 4, 5, 7, 8]  # Grouped positions
     
@@ -41,9 +43,9 @@ def save_comparative_boxplot(data_km_100, data_pk8s_100, data_km_120, data_pk8s_
     colors = [color_km, color_pk8s, color_km, color_pk8s, color_km, color_pk8s]
     
     # Add colored background for parameter groups (gradient based on interfering resources)
-    ax.axvspan(0.5, 3, facecolor='#FFE680', alpha=0.5, zorder=0)      # Yellow for 100 (low interference)
-    ax.axvspan(3, 6, facecolor='#FFB366', alpha=0.5, zorder=0)        # Orange for 120 (medium interference)
-    ax.axvspan(6, 9, facecolor='#FF8FA3', alpha=0.5, zorder=0)        # Pink for 150 (high interference)
+    ax.axvspan(0.5, 3, facecolor='#FFE680', alpha=0.5, zorder=0)      # Yellow for 15 (low interference)
+    ax.axvspan(3, 6, facecolor='#FFB366', alpha=0.5, zorder=0)        # Orange for 30 (medium interference)
+    ax.axvspan(6, 9, facecolor='#FF8FA3', alpha=0.5, zorder=0)        # Pink for 45 (high interference)
     
     # Create boxplot with refined styling and prominent red outliers
     bp = ax.boxplot(all_data, positions=positions, widths=0.7, patch_artist=True,
@@ -108,18 +110,18 @@ def save_comparative_boxplot(data_km_100, data_pk8s_100, data_km_120, data_pk8s_
     for label in ax.get_yticklabels():
         label.set_fontweight('semibold')
     
-    # Format y-axis in seconds (no division by 1000 needed)
+    # Format y-axis values (already scaled as needed)
     ax.yaxis.set_major_formatter(FuncFormatter(lambda x, p: f'{x:.2f}'))
     
     # Add parameter group labels as text annotations at the top of each group
     y_pos = ax.get_ylim()[1] * 0.98  # Near top of plot
-    ax.text(1.5, y_pos, '100', ha='center', va='top', 
+    ax.text(1.5, y_pos, '15', ha='center', va='top', 
             fontsize=25, fontweight='bold',
             bbox=dict(boxstyle='round,pad=0.4', facecolor='white', edgecolor='gray', alpha=0.9, linewidth=1.5))
-    ax.text(4.5, y_pos, '120', ha='center', va='top', 
+    ax.text(4.5, y_pos, '30', ha='center', va='top', 
             fontsize=25, fontweight='bold',
             bbox=dict(boxstyle='round,pad=0.4', facecolor='white', edgecolor='gray', alpha=0.9, linewidth=1.5))
-    ax.text(7.5, y_pos, '150', ha='center', va='top', 
+    ax.text(7.5, y_pos, '45', ha='center', va='top', 
             fontsize=25, fontweight='bold',
             bbox=dict(boxstyle='round,pad=0.4', facecolor='white', edgecolor='gray', alpha=0.9, linewidth=1.5))
     
@@ -130,11 +132,11 @@ def save_comparative_boxplot(data_km_100, data_pk8s_100, data_km_120, data_pk8s_
     print(f"Box-Plot saved to: {plot_path_png}")
 
 
-def save_comparative_cdf_plot(data_km_100, data_pk8s_100, data_km_120, data_pk8s_120,
-                             data_km_150, data_pk8s_150, filename, directory):
+def save_comparative_cdf_plot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30,
+                             data_km_45, data_pk8s_45, filename, directory):
     """
     Create sensitivity analysis CDF plots with 6 lines (3 parameter values x 2 controllers).
-    Shows how CDFs vary with parameter values (100, 120, 150) for both controllers.
+    Shows how CDFs vary with parameter values (15, 30, 45) for both controllers.
     """
     # Set professional style
     plt.rcParams['font.family'] = 'sans-serif'
@@ -152,9 +154,9 @@ def save_comparative_cdf_plot(data_km_100, data_pk8s_100, data_km_120, data_pk8s
     marker_pk8s = 's'
 
     configs = [
-        (axes[0], data_km_100, data_pk8s_100, "100", '#FFE680'),
-        (axes[1], data_km_120, data_pk8s_120, "120", '#FFB366'),
-        (axes[2], data_km_150, data_pk8s_150, "150", '#FF8FA3'),
+        (axes[0], data_km_15, data_pk8s_15, "15", '#FFE680'),
+        (axes[1], data_km_30, data_pk8s_30, "30", '#FFB366'),
+        (axes[2], data_km_45, data_pk8s_45, "45", '#FF8FA3'),
     ]
     
     # Plot CDFs with markers at key percentiles
@@ -249,7 +251,7 @@ def save_comparative_cdf_plot(data_km_100, data_pk8s_100, data_km_120, data_pk8s
     ]
     fig.legend(handles=legend_elements,
            loc='upper right',
-           bbox_to_anchor=(0.98, 0.98),
+           bbox_to_anchor=(0.98, 0.95),
            ncol=1,
            prop={'size': 20, 'weight': 'semibold'},
            framealpha=0.95,
@@ -416,42 +418,42 @@ def main():
         print(
             "Usage: " \
             "python aggregated-results.py " \
-            "<path_to_kube_manager_100_results> <path_to_kube_manager_120_results> <path_to_kube_manager_150_results> " \
-            "<path_to_preempt_k8s_100_results> <path_to_preempt_k8s_120_results> <path_to_preempt_k8s_150_results> " \
+            "<path_to_kube_manager_15_results> <path_to_kube_manager_30_results> <path_to_kube_manager_45_results> " \
+            "<path_to_preempt_k8s_15_results> <path_to_preempt_k8s_30_results> <path_to_preempt_k8s_45_results> " \
             "<number_of_services>")
         sys.exit(1)
     
-    km_path_100 = sys.argv[1]
-    km_path_120 = sys.argv[2]
-    km_path_150 = sys.argv[3]
-    pk8s_path_100 = sys.argv[4]
-    pk8s_path_120 = sys.argv[5]
-    pk8s_path_150 = sys.argv[6]
+    km_path_15 = sys.argv[1]
+    km_path_30 = sys.argv[2]
+    km_path_45 = sys.argv[3]
+    pk8s_path_15 = sys.argv[4]
+    pk8s_path_30 = sys.argv[5]
+    pk8s_path_45 = sys.argv[6]
     num_services = int(sys.argv[7])
     
     # Validate paths
-    if not os.path.isdir(km_path_100):
-        print(f"Error: {km_path_100} is not a valid directory!")
+    if not os.path.isdir(km_path_15):
+        print(f"Error: {km_path_15} is not a valid directory!")
         sys.exit(1)
     
-    if not os.path.isdir(km_path_120):
-        print(f"Error: {km_path_120} is not a valid directory!")
+    if not os.path.isdir(km_path_30):
+        print(f"Error: {km_path_30} is not a valid directory!")
         sys.exit(1)
     
-    if not os.path.isdir(km_path_150):
-        print(f"Error: {km_path_150} is not a valid directory!")
+    if not os.path.isdir(km_path_45):
+        print(f"Error: {km_path_45} is not a valid directory!")
         sys.exit(1)
     
-    if not os.path.isdir(pk8s_path_100):
-        print(f"Error: {pk8s_path_100} is not a valid directory!")
+    if not os.path.isdir(pk8s_path_15):
+        print(f"Error: {pk8s_path_15} is not a valid directory!")
         sys.exit(1)
     
-    if not os.path.isdir(pk8s_path_120):
-        print(f"Error: {pk8s_path_120} is not a valid directory!")
+    if not os.path.isdir(pk8s_path_30):
+        print(f"Error: {pk8s_path_30} is not a valid directory!")
         sys.exit(1)
     
-    if not os.path.isdir(pk8s_path_150):
-        print(f"Error: {pk8s_path_150} is not a valid directory!")
+    if not os.path.isdir(pk8s_path_45):
+        print(f"Error: {pk8s_path_45} is not a valid directory!")
         sys.exit(1)
     
     if num_services <= 0:
@@ -467,12 +469,12 @@ def main():
         print(f"Output directory already exists: {output_dir}")
     
     # Process all 6 experiments
-    km_data_100 = process_experiment_data(km_path_100, num_services, "kube-manager")
-    km_data_120 = process_experiment_data(km_path_120, num_services, "kube-manager")
-    km_data_150 = process_experiment_data(km_path_150, num_services, "kube-manager")
-    pk8s_data_100 = process_experiment_data(pk8s_path_100, num_services, "preempt-k8s")
-    pk8s_data_120 = process_experiment_data(pk8s_path_120, num_services, "preempt-k8s")
-    pk8s_data_150 = process_experiment_data(pk8s_path_150, num_services, "preempt-k8s")
+    km_data_15 = process_experiment_data(km_path_15, num_services, "kube-manager")
+    km_data_30 = process_experiment_data(km_path_30, num_services, "kube-manager")
+    km_data_45 = process_experiment_data(km_path_45, num_services, "kube-manager")
+    pk8s_data_15 = process_experiment_data(pk8s_path_15, num_services, "preempt-k8s")
+    pk8s_data_30 = process_experiment_data(pk8s_path_30, num_services, "preempt-k8s")
+    pk8s_data_45 = process_experiment_data(pk8s_path_45, num_services, "preempt-k8s")
     
     # Create sensitivity analysis box plots
     print("\n" + "="*60)
@@ -491,11 +493,17 @@ def main():
     ]
     
     for metric_key, title, ylabel, fname in box_plots_config:
+        # Do not scale counts/RPS; scale latencies/delays from ms->s
+        if metric_key in ('real_rps', 'lost_requests', 'completed_requests'):
+            scale = 1.0
+        else:
+            scale = 1000.0
+
         save_comparative_boxplot(
-            km_data_100[metric_key], pk8s_data_100[metric_key],
-            km_data_120[metric_key], pk8s_data_120[metric_key],
-            km_data_150[metric_key], pk8s_data_150[metric_key],
-            fname, str(output_dir)
+            km_data_15[metric_key], pk8s_data_15[metric_key],
+            km_data_30[metric_key], pk8s_data_30[metric_key],
+            km_data_45[metric_key], pk8s_data_45[metric_key],
+            fname, str(output_dir), scale_factor=scale
         )
     
     # Create sensitivity analysis CDF plots
@@ -513,9 +521,9 @@ def main():
     
     for metric_key, title, xlabel, fname in cdf_plots_config:
         save_comparative_cdf_plot(
-            km_data_100[metric_key], pk8s_data_100[metric_key],
-            km_data_120[metric_key], pk8s_data_120[metric_key],
-            km_data_150[metric_key], pk8s_data_150[metric_key],
+            km_data_15[metric_key], pk8s_data_15[metric_key],
+            km_data_30[metric_key], pk8s_data_30[metric_key],
+            km_data_45[metric_key], pk8s_data_45[metric_key],
             fname, str(output_dir)
         )
     
