@@ -332,7 +332,7 @@ def parse_audit_logs_file(file_path, controller, service):
                 continue
 
             if 'scale_up_timestamp' in service_metrics:
-                raise ValueError(f"Duplicate scale-up event for {service_name}")
+                raise ValueError(f"Duplicate scale-up event for {service_name} in audit logs file {file_path}")
             service_metrics['scale_up_timestamp'] = int(entry.get('timestamp', '0'))
 
             print(f"  Scale-up event for {service_name} at timestamp {service_metrics['scale_up_timestamp']}")
@@ -348,7 +348,7 @@ def parse_audit_logs_file(file_path, controller, service):
                 continue
             
             if 'starts_processing_timestamp' in service_metrics:
-                raise ValueError(f"Duplicate starts_processing event for {service_name}")
+                raise ValueError(f"Duplicate starts_processing event for {service_name} in audit logs file {file_path}")
             service_metrics['starts_processing_timestamp'] = int(entry.get('timestamp', '0'))
 
             print(f"  Starts processing event for {service_name} at timestamp {service_metrics['starts_processing_timestamp']}")
@@ -371,11 +371,11 @@ def parse_audit_logs_file(file_path, controller, service):
             
             if controller == "kube-manager":
                 if 'starts_processing_timestamp' in service_metrics:
-                    raise ValueError(f"Duplicate starts_processing event for {service_name}")
+                    raise ValueError(f"Duplicate starts_processing event for {service_name} in audit logs file {file_path}")
                 service_metrics['starts_processing_timestamp'] = int(entry.get('timestamp', '0'))
             
             if 'pod_created_timestamp' in service_metrics:
-                    raise ValueError(f"Duplicate pod_created event for {service_name}")
+                    raise ValueError(f"Duplicate pod_created event for {service_name} in audit logs file {file_path}")
             service_metrics['pod_created_timestamp'] = int(entry.get('timestamp', '0'))
 
             print(f"  Pod created event for {service_name} at timestamp {service_metrics['pod_created_timestamp']}")
@@ -398,7 +398,7 @@ def parse_audit_logs_file(file_path, controller, service):
                 continue
             
             if 'pod_started_timestamp' in service_metrics:
-                raise ValueError(f"Duplicate pod_started event for {service_name}")
+                raise ValueError(f"Duplicate pod_started event for {service_name} in audit logs file {file_path}")
             service_metrics['pod_started_timestamp'] = int(entry.get('timestamp', '0'))
 
             print(f"  Pod started event for {service_name} at timestamp {service_metrics['pod_started_timestamp']}")
@@ -414,7 +414,7 @@ def parse_audit_logs_file(file_path, controller, service):
     ]
     for key in required_keys:
         if key not in service_metrics or service_metrics[key] <= 0:
-            raise ValueError(f"Missing or invalid event {key} for service {service_name} in audit logs")
+            raise ValueError(f"Missing or invalid event {key} for service {service_name} in audit logs file {file_path}")
     
     return service_metrics
                     
@@ -509,7 +509,7 @@ def main():
     
     print(f"Scanning directories in {root_path}...")
 
-    # Count status and rps files and check if there are exactly 30 status files, 30 rps files and 30 audit logs files
+    # Count status and rps files and check if there are exactly 10 status files, 10 rps files and 10 audit logs files
     status_files = {}
     rps_files = {}
     for i in range(num_services):
@@ -527,12 +527,12 @@ def main():
             
             print(f"Found {status_count} status files and {rps_count} rps files for {service_name}!")
             
-            if status_count != 30:
-                print(f"Error: Expected exactly 30 status files, but found {status_count} for {service_name}!")
+            if status_count != 10:
+                print(f"Error: Expected exactly 10 status files, but found {status_count} for {service_name}!")
                 sys.exit(1)
             
-            if rps_count != 30:
-                print(f"Error: Expected exactly 30 rps files, but found {rps_count} for {service_name}!")
+            if rps_count != 10:
+                print(f"Error: Expected exactly 10 rps files, but found {rps_count} for {service_name}!")
                 sys.exit(1)
     
     all_audit_files = []
@@ -542,8 +542,8 @@ def main():
 
     print(f"Found {audit_count} audit logs files in total!")
 
-    if audit_count != 30:
-        print(f"Error: Expected exactly 30 audit logs files, but found {audit_count}!")
+    if audit_count != 10:
+        print(f"Error: Expected exactly 10 audit logs files, but found {audit_count}!")
         sys.exit(1)
     
     print("File count validation passed!")
@@ -577,7 +577,7 @@ def main():
         pod_creation_delays = []
         pod_start_delays = []
 
-        for j in range(30):
+        for j in range(10):
             service_id = f"rnn-serving-python-{i+1}"
             service_name = f"service-{i+1}"
             audit_logs_file = os.path.join(root_path, f"loki-logs-iteration_{j+1}.json")

@@ -12,7 +12,7 @@ EXPERIMENT_NAME="rnn-serving-benchmark"
 TEST_TYPE="Deployment"
 INVOKER_POD_BASE_NAME="benchmark-pod"
 INVOKER_PATH="/home"
-NUMBER_OF_SERVICES="10"
+NUMBER_OF_SERVICES="5"
 SERVICE_MANIFEST_BASE_NAME="kn-rnn-serving-python"
 SERVICE_PORT="80"
 RPS="50"
@@ -62,7 +62,7 @@ while getopts "f:t:i:e:c:m:p:q:o:d:n:g:s:r:b:u:l:v:a:k:w:h" opt; do
             echo "  -t <test-type>                      Type of test to run (default: Deployment)"
             echo "  -i <invoker-pod-base-name>          Invoker pod base name in default namespace (default: benchmark-pod)"
             echo "  -e <invoker-path>                   Path to invoker binary inside the pods (default: /home)"
-            echo "  -c <number-of-services>             Number of concurrent RNN Knative services to deploy (default: 10)"
+            echo "  -c <number-of-services>             Number of concurrent RNN Knative services to deploy (default: 5)"
             echo "  -m <service-manifest-base-name>     Services manifest file base name (default: kn-rnn-serving-python)"
             echo "  -p <service-port>                   Services port (default: 80)"
             echo "  -q <requests-per-second>            Requests per second per service (default: 50)"
@@ -398,7 +398,7 @@ for i in $(seq "$BASE_ITERATION" "$ITERATIONS"); do
     # We start the benchmark
     PIDS=()
     START_TIME=$(date +%s%N)
-    sleep 20
+    # sleep 20
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting benchmark..."
     INVOKER_CMD="cd $INVOKER_PATH && ./invoker -port $SERVICE_PORT -time $DURATION -rps $RPS --grpcTimeout $TIMEOUT -latf iteration_${i} > ./invoker-output.log"
     for j in $(seq 1 "$NUMBER_OF_SERVICES"); do
@@ -520,6 +520,17 @@ Real RPS: $REAL_RPS
 EOF
         "
     done
+
+    # Page cache flush on all nodes to minimize the effect of caching on subsequent iterations
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Flushing page cache on all nodes..."
+
+    sync; echo 3 | sudo tee /proc/sys/vm/drop_caches >/dev/null 2>&1
+    ssh root@192.168.100.22 "sync; echo 3 | sudo tee /proc/sys/vm/drop_caches" >/dev/null 2>&1
+    ssh root@192.168.100.23 "sync; echo 3 | sudo tee /proc/sys/vm/drop_caches" >/dev/null 2>&1
+    ssh root@192.168.100.24 "sync; echo 3 | sudo tee /proc/sys/vm/drop_caches" >/dev/null 2>&1
+    ssh root@192.168.100.53 "sync; echo 3 | sudo tee /proc/sys/vm/drop_caches" >/dev/null 2>&1
+
+    # Iteration completed, results saved
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Results saved to $RESULTS_DIR!"
 
     echo "------------------------------------------------"

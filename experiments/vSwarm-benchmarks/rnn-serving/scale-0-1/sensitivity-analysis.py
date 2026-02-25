@@ -13,7 +13,7 @@ from results import (
 
 def save_comparative_boxplot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30, 
                             data_km_45, data_pk8s_45, filename, directory,
-                            scale_factor=1000.0):
+                            ylabel="", scale_factor=1000.0):
     """
     Create a sensitivity analysis boxplot with 6 boxes (3 parameter values x 2 controllers).
     Shows how metrics vary with parameter values (15, 30, 45) for both controllers.
@@ -22,7 +22,7 @@ def save_comparative_boxplot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30,
     plt.rcParams['font.family'] = 'sans-serif'
     plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial', 'Helvetica']
     
-    fig, ax = plt.subplots(figsize=(14, 7), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=(24, 10), constrained_layout=True)
     
     # Prepare data - 6 boxes grouped by parameter value
     # Converti i dati da ms a secondi
@@ -43,9 +43,9 @@ def save_comparative_boxplot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30,
     colors = [color_km, color_pk8s, color_km, color_pk8s, color_km, color_pk8s]
     
     # Add colored background for parameter groups (gradient based on interfering resources)
-    ax.axvspan(0.5, 3, facecolor='#FFE680', alpha=0.5, zorder=0)      # Yellow for 15 (low interference)
-    ax.axvspan(3, 6, facecolor='#FFB366', alpha=0.5, zorder=0)        # Orange for 30 (medium interference)
-    ax.axvspan(6, 9, facecolor='#FF8FA3', alpha=0.5, zorder=0)        # Pink for 45 (high interference)
+    # ax.axvspan(0.5, 3, facecolor='#FFE680', alpha=0.5, zorder=0)      # Yellow for 15 (low interference)
+    # ax.axvspan(3, 6, facecolor='#FFB366', alpha=0.5, zorder=0)        # Orange for 30 (medium interference)
+    # ax.axvspan(6, 9, facecolor='#FF8FA3', alpha=0.5, zorder=0)        # Pink for 45 (high interference)
     
     # Create boxplot with refined styling and prominent red outliers
     bp = ax.boxplot(all_data, positions=positions, widths=0.7, patch_artist=True,
@@ -62,6 +62,13 @@ def save_comparative_boxplot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30,
         patch.set_edgecolor('#000000')  # Black edges for all boxes
         patch.set_alpha(0.7)
         patch.set_linewidth(2)
+        try:
+            if i % 2 == 0:
+                patch.set_hatch('//')
+            else:
+                patch.set_hatch('xx')
+        except Exception:
+            pass
     
     # Style whiskers and caps
     for whisker in bp['whiskers']:
@@ -95,35 +102,65 @@ def save_comparative_boxplot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30,
     # Labels with improved typography
     # ax.set_ylabel(ylabel, fontsize=14, fontweight='semibold', labelpad=10)
     
-    # Add legend
+    # Add legend (figure-level) and place it at the bottom, horizontal and bold
     from matplotlib.patches import Patch
     legend_elements = [
-        Patch(facecolor=color_km, edgecolor=color_km, alpha=0.7, label='Vanilla K8s'),
-        Patch(facecolor=color_pk8s, edgecolor=color_pk8s, alpha=0.7, label='Preempt-K8s')
+        Patch(facecolor=color_km, edgecolor='#000000', linewidth=1.5, alpha=0.7, label='Vanilla K8s', hatch='//'),
+        Patch(facecolor=color_pk8s, edgecolor='#000000', linewidth=1.5, alpha=0.7, label='Preempt-FaaS', hatch='xx')
     ]
-    ax.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(1.05, 0.92),
-              prop={'size': 20, 'weight': 'semibold'}, framealpha=0.95, edgecolor='gray', fancybox=True)
-    
-    # Adjust tick label sizes
-    ax.tick_params(axis='x', which='both', bottom=False, labelbottom=False)   # Remove x-axis ticks
-    ax.tick_params(axis='y', which='major', labelsize=30)  # Set y-axis tick label size
-    for label in ax.get_yticklabels():
-        label.set_fontweight('semibold')
-    
-    # Format y-axis values (already scaled as needed)
-    ax.yaxis.set_major_formatter(FuncFormatter(lambda x, p: f'{x:.2f}'))
+    fig.legend(handles=legend_elements,
+               loc='lower center',
+               bbox_to_anchor=(0.5, -0.08),
+               ncol=2,
+               prop={'size': 24, 'weight': 'semibold'},
+               framealpha=0.95,
+               edgecolor='gray',
+               fancybox=True)
+    fig.subplots_adjust(bottom=0.24)
+
+    # X-axis: show interfering-load parameter values as group ticks (15,30,45)
+    group_positions = [1.5, 4.5, 7.5]
+    group_labels = ['15 Int', '30 Int', '45 Int']
+    ax.set_xticks(group_positions)
+    ax.set_xticklabels(group_labels, fontsize=25, fontweight='bold')
+    ax.tick_params(axis='x', which='major', length=8)
+
+    # Y-axis configuration
+    ax.tick_params(axis='y', which='major', labelsize=30)
+    for lab in ax.get_yticklabels():
+        lab.set_fontweight('semibold')
+
+    # Ensure y-axis includes 0 and add a small top margin
+    try:
+        concatenated = np.concatenate([arr for arr in all_data if len(arr) > 0]) if any(len(arr) > 0 for arr in all_data) else np.array([0.0])
+        ymin = min(0.0, float(np.min(concatenated)))
+        ymax = float(np.max(concatenated)) if concatenated.size > 0 else 1.0
+    except Exception:
+        ymin, ymax = 0.0, 1.0
+    yrange = (ymax - ymin) if (ymax - ymin) != 0 else (abs(ymax) if ymax != 0 else 1.0)
+    ax.set_ylim(bottom=ymin, top=(ymax + 0.05 * yrange))
+
+    # Set y-axis label if provided
+    if ylabel:
+        ax.set_ylabel(ylabel, fontsize=30, fontweight='semibold', labelpad=10)
+
+    # Format y-axis values: integers for counts/RPS (scale_factor==1.0), floats for times
+    if scale_factor == 1.0:
+        ax.yaxis.set_major_formatter(FuncFormatter(lambda x, p: f'{int(round(x))}'))
+    else:
+        ax.yaxis.set_major_formatter(FuncFormatter(lambda x, p: f'{x:.2f}'))
     
     # Add parameter group labels as text annotations at the top of each group
-    y_pos = ax.get_ylim()[1] * 0.98  # Near top of plot
-    ax.text(1.5, y_pos, '15', ha='center', va='top', 
-            fontsize=25, fontweight='bold',
-            bbox=dict(boxstyle='round,pad=0.4', facecolor='white', edgecolor='gray', alpha=0.9, linewidth=1.5))
-    ax.text(4.5, y_pos, '30', ha='center', va='top', 
-            fontsize=25, fontweight='bold',
-            bbox=dict(boxstyle='round,pad=0.4', facecolor='white', edgecolor='gray', alpha=0.9, linewidth=1.5))
-    ax.text(7.5, y_pos, '45', ha='center', va='top', 
-            fontsize=25, fontweight='bold',
-            bbox=dict(boxstyle='round,pad=0.4', facecolor='white', edgecolor='gray', alpha=0.9, linewidth=1.5))
+    # y_pos = ax.get_ylim()[1] * 0.98  # Near top of plot
+    # ax.text(1.5, y_pos, '15', ha='center', va='top', 
+    #         fontsize=25, fontweight='bold',
+    #         bbox=dict(boxstyle='round,pad=0.4', facecolor='white', edgecolor='gray', alpha=0.9, linewidth=1.5))
+    # ax.text(4.5, y_pos, '30', ha='center', va='top', 
+    #         fontsize=25, fontweight='bold',
+    #         bbox=dict(boxstyle='round,pad=0.4', facecolor='white', edgecolor='gray', alpha=0.9, linewidth=1.5))
+    # ax.text(7.5, y_pos, '45', ha='center', va='top', 
+    #         fontsize=25, fontweight='bold',
+    #         bbox=dict(boxstyle='round,pad=0.4', facecolor='white', edgecolor='gray', alpha=0.9, linewidth=1.5))
     
     # Save as PNG
     plot_path_png = os.path.join(directory, filename)
@@ -143,7 +180,7 @@ def save_comparative_cdf_plot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30
     plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial', 'Helvetica']
     
     # 3 horizontal bands (shared x, independent y scale but fixed 0–1)
-    fig, axes = plt.subplots(3, 1, figsize=(14, 12), sharex=True, constrained_layout=True)
+    fig, axes = plt.subplots(3, 1, figsize=(24, 10), sharex=True, constrained_layout=True)
     
     # Scientific colorblind-friendly palette
     color_km = '#42a5f5'   # Blue for kube-manager
@@ -153,10 +190,15 @@ def save_comparative_cdf_plot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30
     marker_km = '^'
     marker_pk8s = 's'
 
+    # configs = [
+    #     (axes[0], data_km_15, data_pk8s_15, "15", '#FFE680'),
+    #     (axes[1], data_km_30, data_pk8s_30, "30", '#FFB366'),
+    #     (axes[2], data_km_45, data_pk8s_45, "45", '#FF8FA3'),
+    # ]
     configs = [
-        (axes[0], data_km_15, data_pk8s_15, "15", '#FFE680'),
-        (axes[1], data_km_30, data_pk8s_30, "30", '#FFB366'),
-        (axes[2], data_km_45, data_pk8s_45, "45", '#FF8FA3'),
+        (axes[0], data_km_15, data_pk8s_15, "15 Int", '#FFFFFF'),
+        (axes[1], data_km_30, data_pk8s_30, "30 Int", '#FFFFFF'),
+        (axes[2], data_km_45, data_pk8s_45, "45 Int", '#FFFFFF'),
     ]
     
     # Plot CDFs with markers at key percentiles
@@ -175,11 +217,15 @@ def save_comparative_cdf_plot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30
             if len(sorted_data) > 0:
                 cdf = np.arange(1, len(sorted_data) + 1) / len(sorted_data)
 
+                # Choose linestyle: solid for Vanilla, dashed for Preempt
+                linestyle = '-' if 'Vanilla' in name else '--'
+
                 # Plot main CDF line
                 ax.plot(sorted_data, cdf,
                         label=name,
                         color=color,
-                        linewidth=2.8,
+                        linestyle=linestyle,
+                        linewidth=4.0,
                         alpha=0.95)
 
                 # Add markers at key percentiles
@@ -224,16 +270,21 @@ def save_comparative_cdf_plot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30
         ax.spines['left'].set_linewidth(1.2)
         ax.spines['bottom'].set_linewidth(1.2)
 
-    # Shared labels
+    # Shared labels: x-axis in seconds and common xlabel
     axes[-1].xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f'{x/1000:.2f}'))
+    axes[-1].set_xlabel('Time (seconds)', fontsize=30, fontweight='semibold')
 
-    # Add legend
+    # Left label on the second subplot (applies as common CDF label)
+    axes[1].set_ylabel('Cumulative Distribution Function (CDF)', fontsize=22, fontweight='semibold', labelpad=12, rotation=90)
+
+    # Add legend at the bottom (thicker lines)
     from matplotlib.lines import Line2D
 
     legend_elements = [
         Line2D([0], [0],
             color=color_km,
-            lw=2.8,
+            lw=4.0,
+            linestyle='-',
             marker='^',
             markersize=9,
             markeredgecolor='white',
@@ -242,21 +293,23 @@ def save_comparative_cdf_plot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30
 
         Line2D([0], [0],
             color=color_pk8s,
-            lw=2.8,
+            lw=4.0,
+            linestyle='--',
             marker='s',
             markersize=9,
             markeredgecolor='white',
             markeredgewidth=1.5,
-            label='Preempt-K8s')
+            label='Preempt-FaaS')
     ]
     fig.legend(handles=legend_elements,
-           loc='upper right',
-           bbox_to_anchor=(0.98, 0.95),
-           ncol=1,
-           prop={'size': 20, 'weight': 'semibold'},
-           framealpha=0.95,
-           edgecolor='gray',
-           fancybox=True)
+               loc='lower center',
+               bbox_to_anchor=(0.5, -0.08),
+               ncol=2,
+               prop={'size': 24, 'weight': 'semibold'},
+               framealpha=0.95,
+               edgecolor='gray',
+               fancybox=True)
+    fig.subplots_adjust(bottom=0.24)
 
     plot_path_png = os.path.join(directory, filename)
     plt.savefig(plot_path_png, dpi=300, bbox_inches='tight', facecolor='white')
@@ -482,16 +535,16 @@ def main():
     print("="*60)
     
     box_plots_config = [
-        ('starts_processing_delays', "Sensitivity Analysis: Starts Processing Delays", "Delays [ms]", "sensitivity_boxplot_starts_processing_delays.png"),
-        ('pod_creation_delays', "Sensitivity Analysis: Pod Creation Delays", "Delays [ms]", "sensitivity_boxplot_pod_creation_delays.png"),
-        ('pod_startup_delays', "Sensitivity Analysis: Pod Startup Delays", "Delays [ms]", "sensitivity_boxplot_pod_startup_delays.png"),
-        ('lost_requests', "Sensitivity Analysis: Lost Requests", "Number of Requests", "sensitivity_boxplot_lost_requests.png"),
-        ('completed_requests', "Sensitivity Analysis: Completed Requests", "Number of Requests", "sensitivity_boxplot_completed_requests.png"),
-        ('real_rps', "Sensitivity Analysis: Real RPS", "Real RPS", "sensitivity_boxplot_real_rps.png"),
-        ('mean_latencies', "Sensitivity Analysis: Mean Latencies", "Latencies [ms]", "sensitivity_boxplot_mean_latencies.png"),
-        ('max_latencies', "Sensitivity Analysis: Max Latencies", "Latencies [ms]", "sensitivity_boxplot_max_latencies.png")
+        ('starts_processing_delays', "Sensitivity Analysis: Starts Processing Delays", "Time (seconds)", "sensitivity_boxplot_starts_processing_delays.png"),
+        ('pod_creation_delays', "Sensitivity Analysis: Pod Creation Delays", "Time (seconds)", "sensitivity_boxplot_pod_creation_delays.png"),
+        ('pod_startup_delays', "Sensitivity Analysis: Pod Startup Delays", "Time (seconds)", "sensitivity_boxplot_pod_startup_delays.png"),
+        ('lost_requests', "Sensitivity Analysis: Lost Requests", "", "sensitivity_boxplot_lost_requests.png"),
+        ('completed_requests', "Sensitivity Analysis: Completed Requests", "", "sensitivity_boxplot_completed_requests.png"),
+        ('real_rps', "Sensitivity Analysis: Real RPS", "", "sensitivity_boxplot_real_rps.png"),
+        ('mean_latencies', "Sensitivity Analysis: Mean Latencies", "Time (seconds)", "sensitivity_boxplot_mean_latencies.png"),
+        ('max_latencies', "Sensitivity Analysis: Max Latencies", "Time (seconds)", "sensitivity_boxplot_max_latencies.png")
     ]
-    
+
     for metric_key, title, ylabel, fname in box_plots_config:
         # Do not scale counts/RPS; scale latencies/delays from ms->s
         if metric_key in ('real_rps', 'lost_requests', 'completed_requests'):
@@ -503,7 +556,7 @@ def main():
             km_data_15[metric_key], pk8s_data_15[metric_key],
             km_data_30[metric_key], pk8s_data_30[metric_key],
             km_data_45[metric_key], pk8s_data_45[metric_key],
-            fname, str(output_dir), scale_factor=scale
+            fname, str(output_dir), ylabel, scale_factor=scale
         )
     
     # Create sensitivity analysis CDF plots

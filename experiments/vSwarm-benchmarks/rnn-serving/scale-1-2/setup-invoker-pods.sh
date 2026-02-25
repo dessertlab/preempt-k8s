@@ -12,11 +12,11 @@ POD_BASE_NAME="benchmark-pod"
 SERVICE_BASE_NAME="rnn-serving-python"
 CREATE="true"
 CRITICAL="true"
-NUMBER_OF_PODS=10
+NUMBER_OF_PODS=5
 DESTINATION_PATH="/home"
 INVOKER_BINARY_SOURCE_PATH="./invoker"
 BUCKET_NODE="dessertw4"
-LIST_OF_NON_FEASIBLE_NODES=("dessertw3" "dessertw4")
+LIST_OF_NON_FEASIBLE_NODES=("dessertw1" "dessertw3" "dessertw4")
 
 # Parse command line flags
 while getopts "p:b:g:n:c:d:s:t:l:h" opt; do
@@ -38,11 +38,11 @@ while getopts "p:b:g:n:c:d:s:t:l:h" opt; do
             echo "  -b <service-base-name>                  Base name of RNN services to create (default: rnn-serving-python)"
             echo "  -g <create>                             Choose whether to create or delete invoker pods (default: true)"
             echo "  -c <critical>                           Choose if the services rely on RTResources - with criticality level = 1 - or Deployments (default: true)"
-            echo "  -n <number-of-pods>                     Number of invoker pods to create or delete (default: 10)"
+            echo "  -n <number-of-pods>                     Number of invoker pods to create or delete (default: 5)"
             echo "  -d <destination-path>                   Destination path in for invoker binary and endpoints.json file in the invoker pods (default: /home)"
             echo "  -s <invoker-binary-source-path>         invoker binary source path on local machine (default: ./invoker)"
             echo "  -t <bucket-node>                        The two nodes where to schedule the invoker pods (default: dessertw4)"
-            echo "  -l <list-of-non-feasible-nodes>         List of nodes where service pods should not be scheduled (default: dessertw3,dessertw4)"
+            echo "  -l <list-of-non-feasible-nodes>         List of nodes where service pods should not be scheduled (default: dessertw1,dessertw3,dessertw4)"
             echo "  -h                                      Show this help message"
             exit 0
             ;;
@@ -106,7 +106,7 @@ if ! kubectl get nodes --no-headers 2>/dev/null | { grep -q "^$BUCKET_NODE" || t
 fi
 
 # Validate list of non-feasible nodes
-if [[ "${#LIST_OF_NON_FEASIBLE_NODES[@]}" -ne 2 ]]; then
+if [[ "${#LIST_OF_NON_FEASIBLE_NODES[@]}" -ne 3 ]]; then
     echo "Error: Two non-feasible nodes must be specified (got: ${#LIST_OF_NON_FEASIBLE_NODES[@]})" >&2
     exit 1
 fi
@@ -127,6 +127,7 @@ if [[ "$CREATE" == "true" ]]; then
         SERVICE_NAME="${SERVICE_BASE_NAME}-${i}"
         NON_FEASIBLE_NODE_1="${LIST_OF_NON_FEASIBLE_NODES[0]}"
         NON_FEASIBLE_NODE_2="${LIST_OF_NON_FEASIBLE_NODES[1]}"
+        NON_FEASIBLE_NODE_3="${LIST_OF_NON_FEASIBLE_NODES[2]}"
 
         if [[ "$CRITICAL" == "true" ]]; then
             cat <<EOF > "$MANIFEST_FILE"
@@ -175,6 +176,7 @@ spec:
                     values:
                       - $NON_FEASIBLE_NODE_1
                       - $NON_FEASIBLE_NODE_2
+                      - $NON_FEASIBLE_NODE_3
       containers:
         - image: docker.io/vhiveease/relay:latest
           imagePullPolicy: Never
@@ -244,6 +246,7 @@ spec:
                     values:
                       - $NON_FEASIBLE_NODE_1
                       - $NON_FEASIBLE_NODE_2
+                      - $NON_FEASIBLE_NODE_3
       containers:
         - image: docker.io/vhiveease/relay:latest
           imagePullPolicy: Never
