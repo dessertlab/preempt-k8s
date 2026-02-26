@@ -19,8 +19,8 @@ def save_comparative_cdf_plot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30
     plt.rcParams['font.family'] = 'sans-serif'
     plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial', 'Helvetica']
     
-    # 3 horizontal bands (shared x, independent y scale but fixed 0–1)
-    fig, axes = plt.subplots(3, 1, figsize=(15, 10), sharex=True, constrained_layout=True)
+    # 2 horizontal bands (shared x, independent y scale but fixed 0–1)
+    fig, axes = plt.subplots(2, 1, figsize=(15, 10), sharex=True, constrained_layout=True)
     
     # Scientific colorblind-friendly palette
     color_km = '#42a5f5'   # Blue for kube-manager
@@ -119,6 +119,7 @@ def save_comparative_cdf_plot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30
 
     # Left label on the second subplot (applies as common CDF label)
     axes[1].set_ylabel('Cumulative Distribution Function (CDF)', fontsize=22, fontweight='semibold', labelpad=12, rotation=90)
+    axes[1].yaxis.set_label_coords(-0.06, 1.02)
 
     # Add legend at the bottom (thicker lines)
     from matplotlib.lines import Line2D
