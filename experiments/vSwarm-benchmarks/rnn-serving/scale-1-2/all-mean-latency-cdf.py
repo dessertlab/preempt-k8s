@@ -10,10 +10,10 @@ from results import (
 
 
 def save_comparative_cdf_plot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30,
-                             data_km_45, data_pk8s_45, filename, directory):
+                             filename, directory):
     """
-    Create sensitivity analysis CDF plots with 6 lines (3 parameter values x 2 controllers).
-    Shows how CDFs vary with parameter values (15, 30, 45) for both controllers.
+    Create sensitivity analysis CDF plots with 4 lines (2 parameter values x 2 controllers).
+    Shows how CDFs vary with parameter values (15, 30) for both controllers.
     """
     # Set professional style
     plt.rcParams['font.family'] = 'sans-serif'
@@ -38,7 +38,6 @@ def save_comparative_cdf_plot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30
     configs = [
         (axes[0], data_km_15, data_pk8s_15, "15 Int", '#FFFFFF'),
         (axes[1], data_km_30, data_pk8s_30, "30 Int", '#FFFFFF'),
-        (axes[2], data_km_45, data_pk8s_45, "45 Int", '#FFFFFF'),
     ]
     
     # Plot CDFs with markers at key percentiles
@@ -183,7 +182,7 @@ def process_experiment_data(root_path, num_services, controller_name):
             rps_files[service_name] = sorted([f for f in all_files if f.startswith("rps") and os.path.isfile(os.path.join(service_path, f))])
     
     # Determine number of iterations
-    num_iterations = 30
+    num_iterations = 10
     
     # Process status and rps files - organized by iteration
     print("\nProcessing status and rps files...")
@@ -219,22 +218,20 @@ def process_experiment_data(root_path, num_services, controller_name):
 
 def main():
     # Validate command line arguments
-    if len(sys.argv) != 8:
+    if len(sys.argv) != 6:
         print(
             "Usage: " \
             "python all-mean-latency-cdf.py " \
-            "<path_to_kube_manager_15_results> <path_to_kube_manager_30_results> <path_to_kube_manager_45_results> " \
-            "<path_to_preempt_k8s_15_results> <path_to_preempt_k8s_30_results> <path_to_preempt_k8s_45_results> " \
+            "<path_to_kube_manager_15_results> <path_to_kube_manager_30_results> " \
+            "<path_to_preempt_k8s_15_results> <path_to_preempt_k8s_30_results> " \
             "<number_of_services>")
         sys.exit(1)
     
     km_path_15 = sys.argv[1]
     km_path_30 = sys.argv[2]
-    km_path_45 = sys.argv[3]
-    pk8s_path_15 = sys.argv[4]
-    pk8s_path_30 = sys.argv[5]
-    pk8s_path_45 = sys.argv[6]
-    num_services = int(sys.argv[7])
+    pk8s_path_15 = sys.argv[3]
+    pk8s_path_30 = sys.argv[4]
+    num_services = int(sys.argv[5])
     
     # Validate paths
     if not os.path.isdir(km_path_15):
@@ -245,20 +242,12 @@ def main():
         print(f"Error: {km_path_30} is not a valid directory!")
         sys.exit(1)
     
-    if not os.path.isdir(km_path_45):
-        print(f"Error: {km_path_45} is not a valid directory!")
-        sys.exit(1)
-    
     if not os.path.isdir(pk8s_path_15):
         print(f"Error: {pk8s_path_15} is not a valid directory!")
         sys.exit(1)
     
     if not os.path.isdir(pk8s_path_30):
         print(f"Error: {pk8s_path_30} is not a valid directory!")
-        sys.exit(1)
-    
-    if not os.path.isdir(pk8s_path_45):
-        print(f"Error: {pk8s_path_45} is not a valid directory!")
         sys.exit(1)
     
     if num_services <= 0:
@@ -276,10 +265,8 @@ def main():
     # Process all 6 experiments
     km_data_15 = process_experiment_data(km_path_15, num_services, "kube-manager")
     km_data_30 = process_experiment_data(km_path_30, num_services, "kube-manager")
-    km_data_45 = process_experiment_data(km_path_45, num_services, "kube-manager")
     pk8s_data_15 = process_experiment_data(pk8s_path_15, num_services, "preempt-k8s")
     pk8s_data_30 = process_experiment_data(pk8s_path_30, num_services, "preempt-k8s")
-    pk8s_data_45 = process_experiment_data(pk8s_path_45, num_services, "preempt-k8s")
     
     # Create sensitivity analysis box plots
     print("\n" + "="*60)
@@ -294,7 +281,6 @@ def main():
     save_comparative_cdf_plot(
         km_data_15, pk8s_data_15,
         km_data_30, pk8s_data_30,
-        km_data_45, pk8s_data_45,
         "sensitivity_cdf_all_mean_latencies.png", str(output_dir)
     )
     
