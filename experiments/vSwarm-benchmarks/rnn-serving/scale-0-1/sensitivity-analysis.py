@@ -236,7 +236,7 @@ def save_comparative_cdf_plot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30
                         ax.plot(sorted_data[idx],
                                 cdf[idx],
                                 marker=marker,
-                                markersize=9,
+                                markersize=15,
                                 color=color,
                                 markeredgecolor='white',
                                 markeredgewidth=1.5,
@@ -286,7 +286,7 @@ def save_comparative_cdf_plot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30
             lw=4.0,
             linestyle='-',
             marker='^',
-            markersize=9,
+            markersize=15,
             markeredgecolor='white',
             markeredgewidth=1.5,
             label='Vanilla K8s'),
@@ -296,7 +296,7 @@ def save_comparative_cdf_plot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30
             lw=4.0,
             linestyle='--',
             marker='s',
-            markersize=9,
+            markersize=15,
             markeredgecolor='white',
             markeredgewidth=1.5,
             label='Preempt-FaaS')
@@ -337,12 +337,21 @@ def process_experiment_data(root_path, num_services, controller_name):
         
         if os.path.isdir(service_path):
             all_files = os.listdir(service_path)
-            status_files[service_name] = sorted([f for f in all_files if f.endswith("status.txt") and os.path.isfile(os.path.join(service_path, f))])
-            rps_files[service_name] = sorted([f for f in all_files if f.startswith("rps") and os.path.isfile(os.path.join(service_path, f))])
+            status_files[service_name] = sorted(
+                [f for f in all_files if f.endswith("status.txt") and os.path.isfile(os.path.join(service_path, f))],
+                key=lambda fname: int(fname.split('_')[1])
+                )
+            rps_files[service_name] = sorted(
+                [f for f in all_files if f.startswith("rps") and os.path.isfile(os.path.join(service_path, f))],
+                key=lambda fname: int(fname.split('_')[-1])
+                )
     
     # Collect audit logs files
     all_audit_files = os.listdir(root_path)
-    audit_files = sorted([os.path.join(root_path, f) for f in all_audit_files if f.startswith("loki-logs-iteration") and os.path.isfile(os.path.join(root_path, f))])
+    audit_files = sorted(
+        [os.path.join(root_path, f) for f in all_audit_files if f.startswith("loki-logs-iteration") and os.path.isfile(os.path.join(root_path, f))],
+        key=lambda fname: int(fname.split('iteration_')[1].split('.json')[0])
+        )
     
     print(f"Found {len(audit_files)} audit logs files")
     
@@ -470,7 +479,7 @@ def main():
     if len(sys.argv) != 8:
         print(
             "Usage: " \
-            "python aggregated-results.py " \
+            "python sensitivity-analysis.py " \
             "<path_to_kube_manager_15_results> <path_to_kube_manager_30_results> <path_to_kube_manager_45_results> " \
             "<path_to_preempt_k8s_15_results> <path_to_preempt_k8s_30_results> <path_to_preempt_k8s_45_results> " \
             "<number_of_services>")

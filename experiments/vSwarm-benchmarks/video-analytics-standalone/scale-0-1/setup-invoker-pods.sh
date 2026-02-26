@@ -12,7 +12,7 @@ POD_BASE_NAME="benchmark-pod"
 SERVICE_BASE_NAME="video-analytics-standalone-python"
 CREATE="true"
 CRITICAL="true"
-NUMBER_OF_PODS=10
+NUMBER_OF_PODS=5
 DESTINATION_PATH="/home"
 INVOKER_BINARY_SOURCE_PATH="./invoker"
 BUCKET_NODE="dessertw4"
@@ -38,7 +38,7 @@ while getopts "p:b:g:n:c:d:s:t:l:h" opt; do
             echo "  -b <service-base-name>                  Base name of video analytics standalone services to create (default: video-analytics-standalone-python)"
             echo "  -g <create>                             Choose whether to create or delete invoker pods (default: true)"
             echo "  -c <critical>                           Choose if the services rely on RTResources - with criticality level = 1 - or Deployments (default: true)"
-            echo "  -n <number-of-pods>                     Number of invoker pods to create or delete (default: 10)"
+            echo "  -n <number-of-pods>                     Number of invoker pods to create or delete (default: 5)"
             echo "  -d <destination-path>                   Destination path in for invoker binary and endpoints.json file in the invoker pods (default: /home)"
             echo "  -s <invoker-binary-source-path>         invoker binary source path on local machine (default: ./invoker)"
             echo "  -t <bucket-node>                        The two nodes where to schedule the invoker pods (default: dessertw4)"

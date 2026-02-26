@@ -106,12 +106,12 @@ def is_scale_up_event(log):
     if not isinstance(request_object, list):
         return False
     
-    # Check if there's a patch operation that sets replicas to 1
+    # Check if there's a patch operation that sets replicas to 2
     has_replicas_patch = False
     for patch_op in request_object:
         if (patch_op.get('op') == 'replace' and 
             patch_op.get('path') == '/spec/replicas' and 
-            patch_op.get('value') == 1):
+            patch_op.get('value') == 2):
             has_replicas_patch = True
             break
     

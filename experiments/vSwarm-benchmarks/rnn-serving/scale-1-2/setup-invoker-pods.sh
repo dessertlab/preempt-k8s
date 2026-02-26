@@ -107,7 +107,7 @@ fi
 
 # Validate list of non-feasible nodes
 if [[ "${#LIST_OF_NON_FEASIBLE_NODES[@]}" -ne 3 ]]; then
-    echo "Error: Two non-feasible nodes must be specified (got: ${#LIST_OF_NON_FEASIBLE_NODES[@]})" >&2
+    echo "Error: Three non-feasible nodes must be specified (got: ${#LIST_OF_NON_FEASIBLE_NODES[@]})" >&2
     exit 1
 fi
 for NODE in "${LIST_OF_NON_FEASIBLE_NODES[@]}"; do

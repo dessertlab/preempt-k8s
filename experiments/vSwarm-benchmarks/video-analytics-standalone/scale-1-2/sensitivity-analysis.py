@@ -355,21 +355,12 @@ def process_experiment_data(root_path, num_services, controller_name):
         
         if os.path.isdir(service_path):
             all_files = os.listdir(service_path)
-            status_files[service_name] = sorted(
-                [f for f in all_files if f.endswith("status.txt") and os.path.isfile(os.path.join(service_path, f))],
-                key=lambda fname: int(fname.split('_')[1])
-                )
-            rps_files[service_name] = sorted(
-                [f for f in all_files if f.startswith("rps") and os.path.isfile(os.path.join(service_path, f))],
-                key=lambda fname: int(fname.split('_')[-1])
-                )
+            status_files[service_name] = sorted([f for f in all_files if f.endswith("status.txt") and os.path.isfile(os.path.join(service_path, f))])
+            rps_files[service_name] = sorted([f for f in all_files if f.startswith("rps") and os.path.isfile(os.path.join(service_path, f))])
     
     # Collect audit logs files
     all_audit_files = os.listdir(root_path)
-    audit_files = sorted(
-        [os.path.join(root_path, f) for f in all_audit_files if f.startswith("loki-logs-iteration") and os.path.isfile(os.path.join(root_path, f))],
-        key=lambda fname: int(fname.split('iteration_')[1].split('.json')[0])
-        )
+    audit_files = sorted([os.path.join(root_path, f) for f in all_audit_files if f.startswith("loki-logs-iteration") and os.path.isfile(os.path.join(root_path, f))])
     
     print(f"Found {len(audit_files)} audit logs files")
     
@@ -391,7 +382,7 @@ def process_experiment_data(root_path, num_services, controller_name):
         iteration_pod_start_delays = []
         
         for i in range(num_services):
-            service_id = f"rnn-serving-python-{i+1}"
+            service_id = f"video-analytics-standalone-python-{i+1}"
             try:
                 metrics = parse_audit_logs_file(audit_file, controller_name, service_id)
                 if metrics:

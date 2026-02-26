@@ -6,6 +6,7 @@ import glob
 import textwrap
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+from matplotlib.lines import Line2D
 import numpy as np
 
 
@@ -187,11 +188,11 @@ def create_scatter_plot(all_experiment_events, output_path, mode, service_name, 
     
     # Create figure with default style
     plt.style.use('default')
-    fig, ax = plt.subplots(figsize=(20, max(10, num_bands * 3)))
+    fig, ax = plt.subplots(figsize=(24, max(10, num_bands * 3)))
     
     # Set white background for figure and dark gray for plot area
     fig.patch.set_facecolor('#FFFFFF')
-    ax.set_facecolor('#333333')
+    ax.set_facecolor('#FFFFFF')
     
     import numpy as np
     
@@ -328,36 +329,41 @@ def create_scatter_plot(all_experiment_events, output_path, mode, service_name, 
     # Format X-axis to show seconds with 's' suffix
     from matplotlib.ticker import FuncFormatter
     def format_func(value, tick_number):
-        return f'{int(value)}s'
+        return f'{int(value)}'
     ax.xaxis.set_major_formatter(FuncFormatter(format_func))
     
     # Add horizontal grid lines for each band (lighter for visibility)
     for i in range(num_bands + 1):
         ax.axhline(y=i, color='#CCCCCC', linestyle='--', alpha=0.6, linewidth=1, zorder=1)
     
-    # Create legend with bright colors
+    # Create legend using the same markers as the plot (Line2D handles)
     # Set max width for legend labels (in characters)
-    max_label_width = 20
-    
+    max_label_width = 50
+
+    # Choose a markersize that visually matches the scatter `s=500`
+    legend_markersize = 18
+
     if mode == 'kube-manager':
         # For kube-manager, starts_processing and pod_created are collapsed
         legend_elements = [
-            mpatches.Patch(color=colors['scale-up'], label=textwrap.fill('Scale-up', max_label_width)),
-            mpatches.Patch(color=colors['starts_processing'], label=textwrap.fill('Starts Processing / Pod Created', max_label_width)),
-            mpatches.Patch(color=colors['pod_started'], label=textwrap.fill('Pod Started', max_label_width))
+            Line2D([0], [0], marker=markers['scale-up'], color='w', markerfacecolor=colors['scale-up'], markeredgecolor='black', markersize=legend_markersize, linestyle='None', label=textwrap.fill('Scale-up', max_label_width)),
+            Line2D([0], [0], marker=markers['starts_processing'], color='w', markerfacecolor=colors['starts_processing'], markeredgecolor='black', markersize=legend_markersize, linestyle='None', label=textwrap.fill('Starts Processing / Pod Created', max_label_width)),
+            Line2D([0], [0], marker=markers['pod_started'], color='w', markerfacecolor=colors['pod_started'], markeredgecolor='black', markersize=legend_markersize, linestyle='None', label=textwrap.fill('Pod Started', max_label_width))
         ]
     else:
         legend_elements = [
-            mpatches.Patch(color=colors['scale-up'], label=textwrap.fill('Scale-up', max_label_width)),
-            mpatches.Patch(color=colors['starts_processing'], label=textwrap.fill('Starts Processing', max_label_width)),
-            mpatches.Patch(color=colors['pod_created'], label=textwrap.fill('Pod Created', max_label_width)),
-            mpatches.Patch(color=colors['pod_started'], label=textwrap.fill('Pod Started', max_label_width))
+            Line2D([0], [0], marker=markers['scale-up'], color='w', markerfacecolor=colors['scale-up'], markeredgecolor='black', markersize=legend_markersize, linestyle='None', label=textwrap.fill('Scale-up', max_label_width)),
+            Line2D([0], [0], marker=markers['starts_processing'], color='w', markerfacecolor=colors['starts_processing'], markeredgecolor='black', markersize=legend_markersize, linestyle='None', label=textwrap.fill('Starts Processing', max_label_width)),
+            Line2D([0], [0], marker=markers['pod_created'], color='w', markerfacecolor=colors['pod_created'], markeredgecolor='black', markersize=legend_markersize, linestyle='None', label=textwrap.fill('Pod Created', max_label_width)),
+            Line2D([0], [0], marker=markers['pod_started'], color='w', markerfacecolor=colors['pod_started'], markeredgecolor='black', markersize=legend_markersize, linestyle='None', label=textwrap.fill('Pod Started', max_label_width))
         ]
     
     legend = ax.legend(
         handles=legend_elements,
-        loc='lower right',
+        loc='lower center',
+        bbox_to_anchor=(0.5, -0.15),
         fontsize=30,
+        ncol=len(legend_elements),
         framealpha=0.95,
         edgecolor='black',
         facecolor='white'
@@ -366,6 +372,10 @@ def create_scatter_plot(all_experiment_events, output_path, mode, service_name, 
     # Set legend text color
     for text in legend.get_texts():
         text.set_color('black')
+
+    # Add axis labels
+    ax.set_xlabel('Time (seconds)', fontsize=50, color='black', fontweight='semibold')
+    ax.set_ylabel('Experiments', fontsize=50, color='black', fontweight='semibold')
     
     # Set spine colors to black
     for spine in ax.spines.values():

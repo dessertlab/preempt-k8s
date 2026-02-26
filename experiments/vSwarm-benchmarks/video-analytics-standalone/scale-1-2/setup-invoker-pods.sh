@@ -9,7 +9,7 @@ set -o pipefail
 
 # Default values
 POD_BASE_NAME="benchmark-pod"
-SERVICE_BASE_NAME="rnn-serving-python"
+SERVICE_BASE_NAME="video-analytics-standalone-python"
 CREATE="true"
 CRITICAL="true"
 NUMBER_OF_PODS=5
@@ -35,7 +35,7 @@ while getopts "p:b:g:n:c:d:s:t:l:h" opt; do
             echo ""
             echo "Options:"
             echo "  -p <pod-base-name>                      Base name of the pods to create or delete (default: benchmark-pod)"
-            echo "  -b <service-base-name>                  Base name of RNN services to create (default: rnn-serving-python)"
+            echo "  -b <service-base-name>                  Base name of video analytics standalone services to create (default: video-analytics-standalone-python)"
             echo "  -g <create>                             Choose whether to create or delete invoker pods (default: true)"
             echo "  -c <critical>                           Choose if the services rely on RTResources - with criticality level = 1 - or Deployments (default: true)"
             echo "  -n <number-of-pods>                     Number of invoker pods to create or delete (default: 5)"
@@ -123,7 +123,7 @@ if [[ "$CREATE" == "true" ]]; then
 
     # Create local Knative Service manifest files
     for i in $(seq 1 "$NUMBER_OF_PODS"); do
-        MANIFEST_FILE="./kn-rnn-serving-python-${i}.yaml"
+        MANIFEST_FILE="./kn-video-analytics-standalone-python-${i}.yaml"
         SERVICE_NAME="${SERVICE_BASE_NAME}-${i}"
         NON_FEASIBLE_NODE_1="${LIST_OF_NON_FEASIBLE_NODES[0]}"
         NON_FEASIBLE_NODE_2="${LIST_OF_NON_FEASIBLE_NODES[1]}"
@@ -162,8 +162,8 @@ spec:
   template:
     metadata:
       annotations:
-        autoscaling.knative.dev/minScale: "0"
-        autoscaling.knative.dev/maxScale: "1"
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "2"
         autoscaling.knative.dev/application-criticality-level: "1"
     spec:
       affinity:
@@ -187,18 +187,16 @@ spec:
             - --addr=0.0.0.0:50000
             - --function-endpoint-url=0.0.0.0
             - --function-endpoint-port=50051
-            - --function-name=rnn-serving-python
-            - --value=French
-            - --generator=random
-            - --lowerBound=10
-            - --upperBound=20
-        - image: docker.io/vhiveease/rnn-serving-python:latest
+            - --function-name=video-analytics-standalone-python
+            - --value=video1.mp4
+        - image: docker.io/vhiveease/video-analytics-standalone-python:latest
           imagePullPolicy: Never
           args:
             - --addr=0.0.0.0
             - --port=50051
-            - --default_language=French
-            - --num_strings=15
+            - --db_addr=mongodb://video-analytics-standalone-database.default.svc.cluster.local:27017
+            - --default_video=default.mp4
+            - --num_frames=10
 EOF
         elif [[ "$CRITICAL" == "false" ]]; then
             cat <<EOF > "$MANIFEST_FILE"
@@ -233,8 +231,8 @@ spec:
   template:
     metadata:
       annotations:
-        autoscaling.knative.dev/minScale: "0"
-        autoscaling.knative.dev/maxScale: "1"
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "2"
     spec:
       affinity:
         nodeAffinity:
@@ -257,18 +255,16 @@ spec:
             - --addr=0.0.0.0:50000
             - --function-endpoint-url=0.0.0.0
             - --function-endpoint-port=50051
-            - --function-name=rnn-serving-python
-            - --value=French
-            - --generator=random
-            - --lowerBound=10
-            - --upperBound=20
-        - image: docker.io/vhiveease/rnn-serving-python:latest
+            - --function-name=video-analytics-standalone-python
+            - --value=video1.mp4
+        - image: docker.io/vhiveease/video-analytics-standalone-python:latest
           imagePullPolicy: Never
           args:
             - --addr=0.0.0.0
             - --port=50051
-            - --default_language=French
-            - --num_strings=15
+            - --db_addr=mongodb://video-analytics-standalone-database.default.svc.cluster.local:27017
+            - --default_video=default.mp4
+            - --num_frames=10
 EOF
         fi
     done
@@ -350,7 +346,7 @@ elif [[ "$CREATE" == "false" ]]; then
     for i in $(seq 1 "$NUMBER_OF_PODS"); do
         POD_NAME="${POD_BASE_NAME}-${i}"
         SERVICE_NAME="${SERVICE_BASE_NAME}-${i}"
-        MANIFEST_FILE="./kn-rnn-serving-python-${i}.yaml"
+        MANIFEST_FILE="./kn-video-analytics-standalone-python-${i}.yaml"
         
         # Delete the invoker pod
         kubectl delete pod "$POD_NAME" --ignore-not-found=true &
