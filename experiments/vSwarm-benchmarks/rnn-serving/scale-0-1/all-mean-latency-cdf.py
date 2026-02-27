@@ -297,6 +297,20 @@ def main():
     pk8s_data_15 = process_experiment_data(pk8s_path_15, num_services, "preempt-k8s")
     pk8s_data_30 = process_experiment_data(pk8s_path_30, num_services, "preempt-k8s")
     pk8s_data_45 = process_experiment_data(pk8s_path_45, num_services, "preempt-k8s")
+
+    # print 50th percentiles (median) for each dataset
+    def print_median(data, label):
+        if data:
+            p50 = np.percentile(data, 50)
+            p95 = np.percentile(data, 95)
+            print(f"{label} 50th percentile = {p50:.2f} ms")
+            print(f"{label} 95th percentile = {p95:.2f} ms")
+        else:
+            print(f"{label} has no data to calculate percentile")
+
+    print("\nComputed 50th and 95th percentiles:")
+    print_median(km_data_45, "kube-manager 45")
+    print_median(pk8s_data_45, "preempt-k8s 45")
     
     # Create sensitivity analysis box plots
     print("\n" + "="*60)
