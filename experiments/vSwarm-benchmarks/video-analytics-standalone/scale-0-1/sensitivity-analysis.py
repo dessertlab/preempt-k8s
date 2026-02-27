@@ -22,7 +22,7 @@ def save_comparative_boxplot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30,
     plt.rcParams['font.family'] = 'sans-serif'
     plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial', 'Helvetica']
     
-    fig, ax = plt.subplots(figsize=(24, 10), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=(17, 9), constrained_layout=True)
     
     # Prepare data - 6 boxes grouped by parameter value
     # Converti i dati da ms a secondi
@@ -61,7 +61,7 @@ def save_comparative_boxplot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30,
         patch.set_facecolor(colors[i])
         patch.set_edgecolor('#000000')  # Black edges for all boxes
         patch.set_alpha(0.7)
-        patch.set_linewidth(2)
+        patch.set_linewidth(3)
         try:
             if i % 2 == 0:
                 patch.set_hatch('//')
@@ -110,25 +110,24 @@ def save_comparative_boxplot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30,
     ]
     fig.legend(handles=legend_elements,
                loc='lower center',
-               bbox_to_anchor=(0.5, -0.08),
+               bbox_to_anchor=(0.5, -0.15),
                ncol=2,
-               prop={'size': 24, 'weight': 'semibold'},
+               prop={'size': 35, 'weight': 'semibold'},
                framealpha=0.95,
                edgecolor='gray',
                fancybox=True)
-    fig.subplots_adjust(bottom=0.24)
 
     # X-axis: show interfering-load parameter values as group ticks (15,30,45)
     group_positions = [1.5, 4.5, 7.5]
-    group_labels = ['15 Int', '30 Int', '45 Int']
+    group_labels = ['15 Stressload', '30 Stressload', '45 Stressload']
     ax.set_xticks(group_positions)
-    ax.set_xticklabels(group_labels, fontsize=25, fontweight='bold')
+    ax.set_xticklabels(group_labels, fontsize=35)
     ax.tick_params(axis='x', which='major', length=8)
 
     # Y-axis configuration
-    ax.tick_params(axis='y', which='major', labelsize=30)
-    for lab in ax.get_yticklabels():
-        lab.set_fontweight('semibold')
+    ax.tick_params(axis='y', which='major', labelsize=35)
+    # for lab in ax.get_yticklabels():
+    #     lab.set_fontweight('semibold')
 
     # Ensure y-axis includes 0 and add a small top margin
     try:
@@ -142,13 +141,14 @@ def save_comparative_boxplot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30,
 
     # Set y-axis label if provided
     if ylabel:
-        ax.set_ylabel(ylabel, fontsize=30, fontweight='semibold', labelpad=10)
+        ax.set_ylabel(ylabel, fontsize=35, fontweight='semibold', labelpad=10)
 
     # Format y-axis values: integers for counts/RPS (scale_factor==1.0), floats for times
-    if scale_factor == 1.0:
-        ax.yaxis.set_major_formatter(FuncFormatter(lambda x, p: f'{int(round(x))}'))
-    else:
-        ax.yaxis.set_major_formatter(FuncFormatter(lambda x, p: f'{x:.2f}'))
+    # if scale_factor == 1.0:
+    #     ax.yaxis.set_major_formatter(FuncFormatter(lambda x, p: f'{int(round(x))}'))
+    # else:
+    #     ax.yaxis.set_major_formatter(FuncFormatter(lambda x, p: f'{x:.2f}'))
+    ax.yaxis.set_major_formatter(FuncFormatter(lambda x, p: f'{int(round(x))}'))
     
     # Add parameter group labels as text annotations at the top of each group
     # y_pos = ax.get_ylim()[1] * 0.98  # Near top of plot
@@ -303,13 +303,12 @@ def save_comparative_cdf_plot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30
     ]
     fig.legend(handles=legend_elements,
                loc='lower center',
-               bbox_to_anchor=(0.5, -0.08),
+               bbox_to_anchor=(0.5, -0.15),
                ncol=2,
-               prop={'size': 24, 'weight': 'semibold'},
+               prop={'size': 35, 'weight': 'semibold'},
                framealpha=0.95,
                edgecolor='gray',
                fancybox=True)
-    fig.subplots_adjust(bottom=0.24)
 
     plot_path_png = os.path.join(directory, filename)
     plt.savefig(plot_path_png, dpi=300, bbox_inches='tight', facecolor='white')
@@ -545,11 +544,11 @@ def main():
     
     box_plots_config = [
         ('starts_processing_delays', "Sensitivity Analysis: Starts Processing Delays", "Time (seconds)", "sensitivity_boxplot_starts_processing_delays.png"),
-        ('pod_creation_delays', "Sensitivity Analysis: Pod Creation Delays", "Time (seconds)", "sensitivity_boxplot_pod_creation_delays.png"),
+        ('pod_creation_delays', "Sensitivity Analysis: Pod Creation Delays", "Pod Creation Latencies (s)", "sensitivity_boxplot_pod_creation_delays.png"),
         ('pod_startup_delays', "Sensitivity Analysis: Pod Startup Delays", "Time (seconds)", "sensitivity_boxplot_pod_startup_delays.png"),
         ('lost_requests', "Sensitivity Analysis: Lost Requests", "", "sensitivity_boxplot_lost_requests.png"),
         ('completed_requests', "Sensitivity Analysis: Completed Requests", "", "sensitivity_boxplot_completed_requests.png"),
-        ('real_rps', "Sensitivity Analysis: Real RPS", "", "sensitivity_boxplot_real_rps.png"),
+        ('real_rps', "Sensitivity Analysis: Real RPS", "Throughput (RPS)", "sensitivity_boxplot_real_rps.png"),
         ('mean_latencies', "Sensitivity Analysis: Mean Latencies", "Time (seconds)", "sensitivity_boxplot_mean_latencies.png"),
         ('max_latencies', "Sensitivity Analysis: Max Latencies", "Time (seconds)", "sensitivity_boxplot_max_latencies.png")
     ]

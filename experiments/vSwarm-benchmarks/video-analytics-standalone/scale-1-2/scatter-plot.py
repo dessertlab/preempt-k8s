@@ -184,11 +184,10 @@ def create_scatter_plot(all_experiment_events, output_path, mode, service_name, 
     }
     
     total_experiments = len(all_experiment_events)
-    num_bands = (total_experiments + experiments_per_band - 1) // experiments_per_band
     
     # Create figure with default style
     plt.style.use('default')
-    fig, ax = plt.subplots(figsize=(24, max(10, num_bands * 3)))
+    fig, ax = plt.subplots(figsize=(24, max(10, total_experiments * 0.6)))
     
     # Set white background for figure and dark gray for plot area
     fig.patch.set_facecolor('#FFFFFF')
@@ -206,17 +205,9 @@ def create_scatter_plot(all_experiment_events, output_path, mode, service_name, 
     
     # Plot events for each experiment
     for exp_idx, events in all_experiment_events:
-        # Determine which band this experiment belongs to
-        band_idx = exp_idx // experiments_per_band
-        
-        # Calculate Y position within the band
-        # Band ranges from band_idx to band_idx+1
-        # Position experiment uniformly within the band with spacing
-        position_in_band = exp_idx % experiments_per_band
-        # Add padding (0.1 at top and bottom of band) and distribute uniformly
-        band_height = 0.8  # Use 80% of band height
-        band_offset = 0.1  # Start 10% from bottom
-        y_base = band_idx + band_offset + (position_in_band + 0.5) * (band_height / experiments_per_band)
+        # Place experiments in a single column (one row per experiment).
+        # Use reversed order so iteration 0 appears at the top.
+        y_base = total_experiments - 1 - exp_idx
         
         # Group events by type
         events_by_type = {}
@@ -307,20 +298,12 @@ def create_scatter_plot(all_experiment_events, output_path, mode, service_name, 
             # Store last point for connecting to next experiment
             prev_last_point = exp_points_sorted[-1]
     
-    # Set Y-axis ticks and labels for bands
-    band_ticks = [i + 0.5 for i in range(num_bands)]
-    band_labels = []
-    for i in range(num_bands):
-        start_exp = i * experiments_per_band + 1
-        end_exp = min((i + 1) * experiments_per_band, total_experiments)
-        if start_exp == end_exp:
-            band_labels.append(f"{start_exp}")
-        else:
-            band_labels.append(f"{start_exp}-{end_exp}")
-    
-    ax.set_yticks(band_ticks)
-    ax.set_yticklabels(band_labels, fontsize=40, color='black')
-    ax.set_ylim(-0.1, num_bands + 0.1)
+    # Set Y-axis ticks and labels: one tick per experiment
+    y_ticks = [i for i in range(total_experiments)]
+    ax.set_yticks(y_ticks)
+    y_labels = [str(i + 1) if ((i + 1) % 5 == 0) else '' for i in range(total_experiments)]
+    ax.set_yticklabels(y_labels, fontsize=28, color='black')
+    ax.set_ylim(-0.5, total_experiments - 0.5)
     
     # Customize tick colors
     ax.tick_params(axis='x', colors='black', labelsize=40)
@@ -332,9 +315,20 @@ def create_scatter_plot(all_experiment_events, output_path, mode, service_name, 
         return f'{int(value)}'
     ax.xaxis.set_major_formatter(FuncFormatter(format_func))
     
-    # Add horizontal grid lines for each band (lighter for visibility)
-    for i in range(num_bands + 1):
-        ax.axhline(y=i, color='#CCCCCC', linestyle='--', alpha=0.6, linewidth=1, zorder=1)
+    # Ensure x starts at zero (no negative ticks) and add vertical lines at x-axis ticks
+    ax.xaxis.set_major_locator(MultipleLocator(1))
+    ax.set_xlim(left=-0.5)
+    # x_ticks = ax.get_xticks()
+    # for xt in x_ticks:
+    #     ax.axvline(x=xt, color='#BBBBBB', linestyle='--', alpha=0.6, linewidth=1, zorder=1)
+
+    # Add horizontal lines at each experiment tick (same color as x ticks)
+    # x_min, x_max = ax.get_xlim()
+    # for yt in y_ticks:
+    #     ax.hlines(y=yt, xmin=x_min, xmax=x_max, colors='#BBBBBB', linestyles='--', alpha=0.6, linewidth=1, zorder=1)
+
+    ax.grid(axis='x', color='#BBBBBB', linestyle='--', alpha=0.6, linewidth=1, zorder=1)
+    ax.grid(axis='y', color='#BBBBBB', linestyle='--', alpha=0.6, linewidth=1, zorder=1)
     
     # Create legend using the same markers as the plot (Line2D handles)
     # Set max width for legend labels (in characters)

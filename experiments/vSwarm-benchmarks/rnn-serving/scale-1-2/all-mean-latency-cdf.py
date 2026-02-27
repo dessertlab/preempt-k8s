@@ -1,12 +1,29 @@
 import os
 import sys
-from matplotlib.ticker import FuncFormatter
+from matplotlib.ticker import FuncFormatter, MaxNLocator
 import matplotlib.pyplot as plt
 import numpy as np
+import math
 from pathlib import Path
 from results import (
     parse_rps_file,
 )
+
+
+def trim_float(value: float) -> str:
+    """Format a float with up to 2 decimals, trimming trailing zeros.
+
+    Examples:
+    - 1.00 -> '1'
+    - 1.50 -> '1.50'
+    - 1.23 -> '1.23'
+    """
+    # Keep two decimals except when the value is an exact integer (i.e. .00)
+    # Round to 2 decimals to avoid floating point noise
+    val = round(value, 2)
+    if float(val).is_integer():
+        return str(int(val))
+    return f"{val:.2f}"
 
 
 def save_comparative_cdf_plot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30,
@@ -19,8 +36,8 @@ def save_comparative_cdf_plot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30
     plt.rcParams['font.family'] = 'sans-serif'
     plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial', 'Helvetica']
     
-    # 2 horizontal bands (shared x, independent y scale but fixed 0–1)
-    fig, axes = plt.subplots(2, 1, figsize=(15, 10), sharex=True, constrained_layout=True)
+    # Arrange subplots horizontally (3 columns), share Y axis (CDF)
+    fig, axes = plt.subplots(1, 2, figsize=(17, 7), sharey=True, constrained_layout=True)
     
     # Scientific colorblind-friendly palette
     color_km = '#42a5f5'   # Blue for kube-manager
@@ -36,8 +53,8 @@ def save_comparative_cdf_plot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30
     #     (axes[2], data_km_45, data_pk8s_45, "45", '#FF8FA3'),
     # ]
     configs = [
-        (axes[0], data_km_15, data_pk8s_15, "15 Int", '#FFFFFF'),
-        (axes[1], data_km_30, data_pk8s_30, "30 Int", '#FFFFFF'),
+        (axes[0], data_km_15, data_pk8s_15, "15 Stressload", '#FFFFFF'),
+        (axes[1], data_km_30, data_pk8s_30, "30 Stressload", '#FFFFFF'),
     ]
     
     # Plot CDFs with markers at key percentiles
@@ -68,7 +85,7 @@ def save_comparative_cdf_plot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30
                         label=name,
                         color=color,
                         linestyle=linestyle,
-                        linewidth=4.0,
+                        linewidth=7.0,
                         alpha=0.95)
 
                 # Add markers at key percentiles
@@ -79,33 +96,26 @@ def save_comparative_cdf_plot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30
                         ax.plot(sorted_data[idx],
                                 cdf[idx],
                                 marker=marker,
-                                markersize=15,
+                                markersize=20,
                                 color=color,
                                 markeredgecolor='white',
                                 markeredgewidth=1.5,
                                 zorder=5)
 
-        # Parameter label inside subplot
-        ax.text(0.98, 0.20, f"{label}",
-        ha='right', va='top',
-        fontsize=25, fontweight='bold',
-        bbox=dict(boxstyle='round,pad=0.4',
-                  facecolor='white',
-                  edgecolor='gray',
-                  alpha=0.9,
-                  linewidth=1.5),
-        transform=ax.transAxes)
+        # Parameter label: use it as the subplot title (aligned right)
+        ax.set_title(f"{label}", fontsize=35, fontweight='bold', loc='center')
 
         # Professional styling
         ax.grid(True, linestyle='--', alpha=0.25, linewidth=0.8, color='#888888')
         ax.set_ylim([0, 1.02])
-        ax.set_yticks([0, 0.5, 1.0])
-        ax.tick_params(axis='y', which='major', labelsize=25)
-        ax.tick_params(axis='x', which='major', labelsize=30)
-        for label in ax.get_yticklabels():
-            label.set_fontweight('semibold')
-        for label in ax.get_xticklabels():
-            label.set_fontweight('semibold')
+        ax.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
+        ax.yaxis.set_major_formatter(FuncFormatter(lambda y, pos: trim_float(y)))
+        ax.tick_params(axis='y', which='major', labelsize=35)
+        ax.tick_params(axis='x', which='major', labelsize=35)
+        # for label in ax.get_yticklabels():
+        #     label.set_fontweight('semibold')
+        # for label in ax.get_xticklabels():
+        #     label.set_fontweight('semibold')
 
         # Remove top/right spines
         ax.spines['top'].set_visible(False)
@@ -113,13 +123,20 @@ def save_comparative_cdf_plot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30
         ax.spines['left'].set_linewidth(1.2)
         ax.spines['bottom'].set_linewidth(1.2)
 
-    # Shared labels: x-axis in seconds and common xlabel
-    axes[-1].xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f'{x/1000:.2f}'))
-    axes[-1].set_xlabel('Time (seconds)', fontsize=30, fontweight='semibold')
+    for ax in axes:
+        ax.xaxis.set_major_formatter(FuncFormatter(lambda x, pos: trim_float(x/1000)))
+        ax.xaxis.set_major_locator(MaxNLocator(nbins=6, steps=[1, 2, 4, 5, 10]))
 
-    # Left label on the second subplot (applies as common CDF label)
-    axes[1].set_ylabel('Cumulative Distribution Function (CDF)', fontsize=22, fontweight='semibold', labelpad=12, rotation=90)
-    axes[1].yaxis.set_label_coords(-0.06, 1.02)
+        # slight left padding so 0 isn't flush with the y-axis
+        x0, x1 = ax.get_xlim()
+        pad = 0.02 * (x1 - x0)  # 2% of the current x-range; adjust if needed
+        ax.set_xlim(left=(x0 - pad), right=x1)
+
+    # Shared X label for the figure (common xlabel)
+    fig.supxlabel('Time (s)', fontsize=35, fontweight='semibold', ha='center')
+
+    # Shared Y label for the figure (common CDF label)
+    fig.supylabel('E2E Latency CDF', fontsize=35, fontweight='semibold', ha='center')
 
     # Add legend at the bottom (thicker lines)
     from matplotlib.lines import Line2D
@@ -147,13 +164,12 @@ def save_comparative_cdf_plot(data_km_15, data_pk8s_15, data_km_30, data_pk8s_30
     ]
     fig.legend(handles=legend_elements,
                loc='lower center',
-               bbox_to_anchor=(0.5, -0.08),
+               bbox_to_anchor=(0.5, -0.15),
                ncol=2,
-               prop={'size': 24, 'weight': 'semibold'},
+               prop={'size': 30, 'weight': 'semibold'},
                framealpha=0.95,
                edgecolor='gray',
                fancybox=True)
-    fig.subplots_adjust(bottom=0.24)
 
     plot_path_png = os.path.join(directory, filename)
     plt.savefig(plot_path_png, dpi=300, bbox_inches='tight', facecolor='white')
