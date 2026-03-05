@@ -63,13 +63,13 @@ config:
   exporters:
     # Loki endpoint for logs
     otlphttp:
-      endpoint: http://10.244.1.177:3100/otlp
+      endpoint: http://loki.observability.svc.cluster.local:3100/otlp
       tls:
         insecure: true
 
     # Zipkin endpoint for logs
     # zipkin:
-    #   endpoint: http://10.100.118.133:9411/api/v2/spans
+    #   endpoint: http://zipkin.observability.svc.cluster.local:9411/api/v2/spans
     #   format: json
     #   default_service_name: unknown-service
 

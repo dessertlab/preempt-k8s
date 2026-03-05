@@ -26,7 +26,7 @@ BASE_SCALE="0"
 SCALE_UPS_ALLOWED="1"
 LOKI_NAMESPACE="observability"
 LOKI_NAME="loki-0"
-LOKI_IP_ADDRESS="10.244.1.207"
+LOKI_IP_ADDRESS="loki.observability.svc.cluster.local"
 LOKI_FLUSH="false"
 FORCE_CLEANUP="true"
 
