@@ -12,11 +12,15 @@ use std::{
 use libc::{
     pthread_create,
     pthread_join,
+    cpu_set_t,
+    CPU_ZERO,
+    CPU_SET,
     pthread_attr_t,
     pthread_attr_init,
     pthread_attr_setschedpolicy,
     pthread_attr_setschedparam,
     pthread_attr_setinheritsched,
+    pthread_attr_setaffinity_np,
     pthread_attr_destroy,
     sched_param,
     SCHED_FIFO,
@@ -49,6 +53,21 @@ pub extern "C" fn server(thread_data: *mut c_void) -> *mut c_void {
 			shared_state.workers[i].active = false;
 		}
         let mut last_working: usize = 0;
+
+        /*
+        We also retrieve the CPU pinning configuration
+        */
+        let watchdogs_cpu_list: Vec<usize> = shared_state.config.watchdogs_cpu_list
+            .split(',')
+            .filter_map(|s| s.trim().parse().ok())
+            .collect();
+        let mut cpuset: cpu_set_t = mem::zeroed();
+        CPU_ZERO(&mut cpuset);
+        if shared_state.config.thread_cpu_pinning {
+            for &cpu in &watchdogs_cpu_list {
+                CPU_SET(cpu, &mut cpuset);
+            }
+        }
         
         /*
         Now we can create the initial watchdog threads  
@@ -65,6 +84,13 @@ pub extern "C" fn server(thread_data: *mut c_void) -> *mut c_void {
 
 		param.sched_priority = 94;
 		pthread_attr_setschedparam(&mut attr, &param);
+        if shared_state.config.thread_cpu_pinning {
+            pthread_attr_setaffinity_np(
+                &mut attr,
+                std::mem::size_of::<cpu_set_t>(),
+                &cpuset
+            );
+        }
 		for i in 0..shared_state.config.min_watchdogs {
 		    result = pthread_create(
                 &mut shared_state.workers[i].id,

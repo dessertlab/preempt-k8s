@@ -37,4 +37,10 @@ preempt_k8s:
     MAX_WATCHDOGS: "20"
     THRESHOLD: "3"
     EVENT_QUEUE: "/eventqueue"
+    THREAD_CPU_PINNING: "true"
+    RESOURCE_WATCHER_CPU_LIST: "0"
+    POD_WATCHER_CPU_LIST: "1"
+    SERVER_CPU_LIST: "2"
+    STATE_UPDATER_CPU_LIST: "3"
+    WATCHDOGS_CPU_LIST: "4,5"
   

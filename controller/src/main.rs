@@ -14,11 +14,15 @@ use libc::{
     pthread_t,
     pthread_create,
     pthread_join,
+    cpu_set_t,
+    CPU_ZERO,
+    CPU_SET,
     pthread_attr_t,
     pthread_attr_init,
     pthread_attr_setschedpolicy,
     pthread_attr_setschedparam,
     pthread_attr_setinheritsched,
+    pthread_attr_setaffinity_np,
     pthread_attr_destroy,
     sched_param,
     SCHED_FIFO,
@@ -58,8 +62,56 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         /*
         We must first retrieve the controller configuration.
         */
-        let config = get_controller_configuration();
+        let mut config = get_controller_configuration();
         println!("{}", config);
+
+        let resource_watcher_cpu_list: Vec<usize> = config.resource_watcher_cpu_list
+            .split(',')
+            .filter_map(|s| s.trim().parse().ok())
+            .collect();
+        let pod_watcher_cpu_list: Vec<usize> = config.pod_watcher_cpu_list
+            .split(',')
+            .filter_map(|s| s.trim().parse().ok())
+            .collect();
+        let server_cpu_list: Vec<usize> = config.server_cpu_list
+            .split(',')
+            .filter_map(|s| s.trim().parse().ok())
+            .collect();
+        let state_updater_cpu_list: Vec<usize> = config.state_updater_cpu_list
+            .split(',')
+            .filter_map(|s| s.trim().parse().ok())
+            .collect();
+        let watchdogs_cpu_list: Vec<usize> = config.watchdogs_cpu_list
+            .split(',')
+            .filter_map(|s| s.trim().parse().ok())
+            .collect();
+        if config.thread_cpu_pinning {
+            let old_cpu_pinning_flag = config.thread_cpu_pinning;
+            config.thread_cpu_pinning = !resource_watcher_cpu_list.is_empty() &&
+                !pod_watcher_cpu_list.is_empty() &&
+                !server_cpu_list.is_empty() &&
+                !state_updater_cpu_list.is_empty() &&
+                !watchdogs_cpu_list.is_empty();
+            if old_cpu_pinning_flag != config.thread_cpu_pinning {
+                eprintln!("Invalid CPU pinning configuration detected! Thread CPU pinning will be disabled.");
+            }
+            else {
+                println!(
+                    "Actual thread CPU dispatching:\n\
+                    - Resource Watcher CPU list: {:?}\n\
+                    - Pod Watcher CPU list:      {:?}\n\
+                    - Server CPU list:           {:?}\n\
+                    - State Updater CPU list:    {:?}\n\
+                    - Watchdogs CPU list:        {:?}\n\
+                    Eventual invalid values have been filtered out!",
+                    resource_watcher_cpu_list,
+                    pod_watcher_cpu_list,
+                    server_cpu_list,
+                    state_updater_cpu_list,
+                    watchdogs_cpu_list
+                );
+            }
+        }
 
         /*
         We create a mutex and a condition variable
@@ -117,6 +169,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         let mut attr: pthread_attr_t = mem::zeroed();
         let mut param: sched_param = sched_param{sched_priority: 0};
         let mut result: i32;
+        let mut cpuset: cpu_set_t = mem::zeroed();
         pthread_attr_init(&mut attr);
         pthread_attr_setschedpolicy(&mut attr, SCHED_FIFO);
         pthread_attr_setinheritsched(&mut attr, PTHREAD_EXPLICIT_SCHED);
@@ -124,6 +177,17 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         param.sched_priority = 96;
         pthread_attr_setschedparam(&mut attr, &param);
 
+        if config.thread_cpu_pinning {
+            CPU_ZERO(&mut cpuset);
+            for &cpu in &resource_watcher_cpu_list {
+                CPU_SET(cpu, &mut cpuset);
+            }
+            pthread_attr_setaffinity_np(
+                &mut attr,
+                std::mem::size_of::<cpu_set_t>(),
+                &cpuset
+            );
+        }
         result = pthread_create(
             &mut crd_watcher_thread,
             &attr as *const _ as *const pthread_attr_t,
@@ -134,6 +198,18 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
             eprintln!("An error occurred while creating the CRD Watcher thread! {}", result);
         }
 
+        if config.thread_cpu_pinning {
+            cpuset = mem::zeroed();
+            CPU_ZERO(&mut cpuset);
+            for &cpu in &pod_watcher_cpu_list {
+                CPU_SET(cpu, &mut cpuset);
+            }
+            pthread_attr_setaffinity_np(
+                &mut attr,
+                std::mem::size_of::<cpu_set_t>(),
+                &cpuset
+            );
+        }
         result = pthread_create(
             &mut pod_watcher_thread,
             &attr as *const _ as *const pthread_attr_t,
@@ -144,6 +220,18 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
             eprintln!("An error occurred while creating the Pod Event Watcher thread!");
         }
 
+        if config.thread_cpu_pinning {
+            cpuset = mem::zeroed();
+            CPU_ZERO(&mut cpuset);
+            for &cpu in &state_updater_cpu_list {
+                CPU_SET(cpu, &mut cpuset);
+            }
+            pthread_attr_setaffinity_np(
+                &mut attr,
+                std::mem::size_of::<cpu_set_t>(),
+                &cpuset
+            );
+        }
         result = pthread_create(
             &mut resource_state_updater_thread,
             &attr as *const _ as *const pthread_attr_t,
@@ -156,6 +244,18 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
 
         param.sched_priority = 95;
         pthread_attr_setschedparam(&mut attr, &param);
+        if config.thread_cpu_pinning {
+            cpuset = mem::zeroed();
+            CPU_ZERO(&mut cpuset);
+            for &cpu in &server_cpu_list {
+                CPU_SET(cpu, &mut cpuset);
+            }
+            pthread_attr_setaffinity_np(
+                &mut attr,
+                std::mem::size_of::<cpu_set_t>(),
+                &cpuset
+            );
+        }
         result = pthread_create(
             &mut server_thread,
             &attr as *const _ as *const pthread_attr_t,
