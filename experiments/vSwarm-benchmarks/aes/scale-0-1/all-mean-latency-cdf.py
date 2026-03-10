@@ -200,7 +200,7 @@ def process_experiment_data(root_path, num_services, controller_name):
             rps_files[service_name] = sorted([f for f in all_files if f.startswith("rps") and os.path.isfile(os.path.join(service_path, f))])
     
     # Determine number of iterations
-    num_iterations = 30
+    num_iterations = 10
     
     # Process status and rps files - organized by iteration
     print("\nProcessing status and rps files...")

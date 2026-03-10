@@ -509,7 +509,7 @@ def main():
     
     print(f"Scanning directories in {root_path}...")
 
-    # Count status and rps files and check if there are exactly 30 status files, 30 rps files and 30 audit logs files
+    # Count status and rps files and check if there are exactly 10 status files, 10 rps files and 10 audit logs files
     status_files = {}
     rps_files = {}
     for i in range(num_services):
@@ -527,12 +527,12 @@ def main():
             
             print(f"Found {status_count} status files and {rps_count} rps files for {service_name}!")
             
-            if status_count != 30:
-                print(f"Error: Expected exactly 30 status files, but found {status_count} for {service_name}!")
+            if status_count != 10:
+                print(f"Error: Expected exactly 10 status files, but found {status_count} for {service_name}!")
                 sys.exit(1)
             
-            if rps_count != 30:
-                print(f"Error: Expected exactly 30 rps files, but found {rps_count} for {service_name}!")
+            if rps_count != 10:
+                print(f"Error: Expected exactly 10 rps files, but found {rps_count} for {service_name}!")
                 sys.exit(1)
     
     all_audit_files = []
@@ -542,8 +542,8 @@ def main():
 
     print(f"Found {audit_count} audit logs files in total!")
 
-    if audit_count != 30:
-        print(f"Error: Expected exactly 30 audit logs files, but found {audit_count}!")
+    if audit_count != 10:
+        print(f"Error: Expected exactly 10 audit logs files, but found {audit_count}!")
         sys.exit(1)
     
     print("File count validation passed!")
@@ -577,7 +577,7 @@ def main():
         pod_creation_delays = []
         pod_start_delays = []
 
-        for j in range(30):
+        for j in range(10):
             service_id = f"aes-python-{i+1}"
             service_name = f"service-{i+1}"
             audit_logs_file = os.path.join(root_path, f"loki-logs-iteration_{j+1}.json")
