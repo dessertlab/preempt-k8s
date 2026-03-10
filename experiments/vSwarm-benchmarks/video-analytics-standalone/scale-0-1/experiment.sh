@@ -25,8 +25,8 @@ NUMBER_OF_INTERFERING_RESOURCES="40"
 BASE_SCALE="0"
 SCALE_UPS_ALLOWED="1"
 LOKI_NAMESPACE="observability"
-LOKI_NAME="loki-0"
-LOKI_IP_ADDRESS="loki.observability.svc.cluster.local"
+LOKI_NAME="loki"
+LOKI_IP_ADDRESS="10.110.33.60"
 LOKI_FLUSH="false"
 FORCE_CLEANUP="true"
 
@@ -74,9 +74,9 @@ while getopts "f:t:i:e:c:m:p:q:o:d:n:g:s:r:b:u:l:v:a:k:w:h" opt; do
             echo "  -r <number-of-resources>            Number of interfering resources (default: 40)"
             echo "  -b <base-scale>                     Base scale for the tested services (default: 0)"
             echo "  -u <scale-ups-allowed>              Number of allowed scale-up pods per service (default: 1)"
-            echo "  -l <loki-namespace>                 Namespace where the Loki instance is deployed (default: observability)"
-            echo "  -v <loki-name>                      Name of the Loki pod (default: loki-0)"
-            echo "  -a <loki-ip-address>                IP address of the Loki instance to query for control plane logs (default: 10.244.1.207)"
+            echo "  -l <loki-namespace>                 Namespace where the Loki service is deployed (default: observability)"
+            echo "  -v <loki-name>                      Name of the Loki service (default: loki)"
+            echo "  -a <loki-ip-address>                IP address of the Loki service to query for control plane logs (default: 10.110.33.60)"
             echo "  -k <loki-flush>                     Whether to flush Loki logs before each iteration (default: false)"
             echo "  -w <force-cleanup>                  Force cleanup of tested services' resources after test, use when pods require too much time to terminate (default: true)"
             echo "  -h                                  Show this help message"
@@ -147,7 +147,7 @@ if ! [[ "$SERVICE_PORT" =~ ^[0-9]+$ ]] || [[ "$SERVICE_PORT" -lt 1 ]]; then
 fi
 
 # Validate RPS is a positive number
-if ! [[ "$RPS" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+if ! [[ "$RPS" =~ ^[0-9]+$ ]] || [[ "$RPS" -lt 1 ]]; then
     echo "Error: RPS must be a positive number (got: $RPS)" >&2
     exit 1
 fi
@@ -206,14 +206,14 @@ if ! kubectl get namespace "$LOKI_NAMESPACE" &>/dev/null; then
     exit 1
 fi
 
-# Validate Loki pod
-if ! kubectl get pod "$LOKI_NAME" -n "$LOKI_NAMESPACE" &>/dev/null; then
-    echo "Error: Loki pod '$LOKI_NAME' does not exist in namespace '$LOKI_NAMESPACE'" >&2
+# Validate Loki service
+if ! kubectl get svc "$LOKI_NAME" -n "$LOKI_NAMESPACE" &>/dev/null; then
+    echo "Error: Loki service '$LOKI_NAME' does not exist in namespace '$LOKI_NAMESPACE'" >&2
     exit 1
 fi
 
 # Validate Loki IP address
-if [ $(kubectl get pod "$LOKI_NAME" -n "$LOKI_NAMESPACE" -o jsonpath="{.status.podIP}") != "$LOKI_IP_ADDRESS" ]; then
+if [ $(kubectl get svc "$LOKI_NAME" -n "$LOKI_NAMESPACE" -o jsonpath="{.spec.clusterIP}") != "$LOKI_IP_ADDRESS" ]; then
     echo "Error: the provided Loki IP address does not match the actual IP address in namespace '$LOKI_NAMESPACE'" >&2
     exit 1
 fi

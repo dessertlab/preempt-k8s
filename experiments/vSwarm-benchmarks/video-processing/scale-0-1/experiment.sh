@@ -8,12 +8,12 @@ set -u
 set -o pipefail
 
 # Default values
-EXPERIMENT_NAME="rnn-serving-benchmark"
+EXPERIMENT_NAME="video-processing-benchmark"
 TEST_TYPE="Deployment"
 INVOKER_POD_BASE_NAME="benchmark-pod"
 INVOKER_PATH="/home"
 NUMBER_OF_SERVICES="5"
-SERVICE_MANIFEST_BASE_NAME="kn-rnn-serving-python"
+SERVICE_MANIFEST_BASE_NAME="kn-video-processing-python"
 SERVICE_PORT="80"
 RPS="50"
 TIMEOUT="40"
@@ -22,7 +22,7 @@ ITERATIONS="1"
 OFFSET="0"
 INTERFERENCE_SCRIPT="interfering-load.sh"
 NUMBER_OF_INTERFERING_RESOURCES="40"
-BASE_SCALE="1"
+BASE_SCALE="0"
 SCALE_UPS_ALLOWED="1"
 LOKI_NAMESPACE="observability"
 LOKI_NAME="loki"
@@ -58,12 +58,12 @@ while getopts "f:t:i:e:c:m:p:q:o:d:n:g:s:r:b:u:l:v:a:k:w:h" opt; do
             echo "Usage: $0 [OPTIONS]"
             echo ""
             echo "Options:"
-            echo "  -f <experiment-name>                Name of the experiment (default: rnn-serving-benchmark)"
+            echo "  -f <experiment-name>                Name of the experiment (default: video-processing-benchmark)"
             echo "  -t <test-type>                      Type of test to run (default: Deployment)"
             echo "  -i <invoker-pod-base-name>          Invoker pod base name in default namespace (default: benchmark-pod)"
             echo "  -e <invoker-path>                   Path to invoker binary inside the pods (default: /home)"
-            echo "  -c <number-of-services>             Number of concurrent RNN Knative services to deploy (default: 5)"
-            echo "  -m <service-manifest-base-name>     Services manifest file base name (default: kn-rnn-serving-python)"
+            echo "  -c <number-of-services>             Number of concurrent video processing Knative services to deploy (default: 5)"
+            echo "  -m <service-manifest-base-name>     Services manifest file base name (default: kn-video-processing-python)"
             echo "  -p <service-port>                   Services port (default: 80)"
             echo "  -q <requests-per-second>            Requests per second per service (default: 50)"
             echo "  -o <timeout>                        Timeout for each request in seconds (default: 40)"
@@ -72,7 +72,7 @@ while getopts "f:t:i:e:c:m:p:q:o:d:n:g:s:r:b:u:l:v:a:k:w:h" opt; do
             echo "  -g <offset>                         Iterations offset (default: 0)"
             echo "  -s <interference-script>            Interference script to run (default: interfering-load.sh)"
             echo "  -r <number-of-resources>            Number of interfering resources (default: 40)"
-            echo "  -b <base-scale>                     Base scale for the tested services (default: 1)"
+            echo "  -b <base-scale>                     Base scale for the tested services (default: 0)"
             echo "  -u <scale-ups-allowed>              Number of allowed scale-up pods per service (default: 1)"
             echo "  -l <loki-namespace>                 Namespace where the Loki service is deployed (default: observability)"
             echo "  -v <loki-name>                      Name of the Loki service (default: loki)"
@@ -237,7 +237,7 @@ fi
 
 # Display configuration
 echo "================================================"
-echo "vSwarm RNN Benchmark - Starting"
+echo "vSwarm Video Processing Benchmark - Starting"
 echo "================================================"
 echo "Experiment Name: $EXPERIMENT_NAME"
 echo "Test Type: $TEST_TYPE"
@@ -281,9 +281,9 @@ fi
 # Create results directory
 echo "Creating results directory..."
 if [ "$TEST_TYPE" == "Deployment" ]; then
-    RESULTS_DIR="/experiments/knative/vSwarm-benchmarks/rnn-serving/kube-manager/$EXPERIMENT_NAME"
+    RESULTS_DIR="/experiments/knative/vSwarm-benchmarks/video-processing/kube-manager/$EXPERIMENT_NAME"
 elif [ "$TEST_TYPE" == "RTResource" ]; then
-    RESULTS_DIR="/experiments/knative/vSwarm-benchmarks/rnn-serving/preempt-k8s/$EXPERIMENT_NAME"
+    RESULTS_DIR="/experiments/knative/vSwarm-benchmarks/video-processing/preempt-k8s/$EXPERIMENT_NAME"
 fi
 
 if [ "$OFFSET" -eq 0 ]; then
@@ -303,7 +303,7 @@ if [ "$OFFSET" -eq 0 ]; then
     kubectl exec "${INVOKER_POD_BASE_NAME}-1" -- bash -c "
         cat > $RESULTS_DIR/config.txt <<EOF
 ================================================
-vSwarm RNN Benchmark - Test Configuration
+vSwarm Video Processing Benchmark - Test Configuration
 ================================================
 Experiment Name: $EXPERIMENT_NAME
 Test Type: $TEST_TYPE
@@ -328,8 +328,8 @@ for i in $(seq 1 "$NUMBER_OF_SERVICES"); do
     kubectl apply -f "$SERVICE_MANIFEST" &>/dev/null
 done
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for rnn-serving-python services base pods to be Running..."
-while [ $(kubectl get pods --no-headers | { grep "^rnn-serving-python" || true; } | { grep "Running" || true; } | { grep "3/3" || true; } | wc -l) -ne $NUMBER_OF_SERVICES ]; do
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for video-processing-python services base pods to be Running..."
+while [ $(kubectl get pods --no-headers | { grep "^video-processing-python" || true; } | { grep "Running" || true; } | { grep "3/3" || true; } | wc -l) -ne $NUMBER_OF_SERVICES ]; do
     sleep 2
 done
 sleep 10
@@ -342,7 +342,7 @@ if [ "$BASE_SCALE" -eq 0 ]; then
     if [ "$FORCE_CLEANUP" == "true" ]; then
         TIMEOUT_SECONDS=90
         ELAPSED=0
-        while [ $(kubectl get pods --no-headers | { grep "^rnn-serving-python" || true; } | { grep "Terminating" || true; } | wc -l) -ne $NUMBER_OF_SERVICES ]; do
+        while [ $(kubectl get pods --no-headers | { grep "^video-processing-python" || true; } | { grep "Terminating" || true; } | wc -l) -ne $NUMBER_OF_SERVICES ]; do
             if [ $ELAPSED -ge $TIMEOUT_SECONDS ]; then
                 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Timeout waiting for pods to enter Terminating state"
                 exit 1
@@ -350,10 +350,10 @@ if [ "$BASE_SCALE" -eq 0 ]; then
             sleep 2
             ELAPSED=$((ELAPSED + 2))
         done
-        TERMINATING_PODS=$(kubectl get pods --no-headers | { grep "^rnn-serving-python" || true; } | { grep "Terminating" || true; } | awk '{print $1}')
+        TERMINATING_PODS=$(kubectl get pods --no-headers | { grep "^video-processing-python" || true; } | { grep "Terminating" || true; } | awk '{print $1}')
         kubectl delete pods $TERMINATING_PODS --grace-period=0 --force &>/dev/null || true
     fi
-    while [ $(kubectl get pods --no-headers | { grep "^rnn-serving-python" || true; } | wc -l) -gt 0 ]; do
+    while [ $(kubectl get pods --no-headers | { grep "^video-processing-python" || true; } | wc -l) -gt 0 ]; do
         sleep 2
     done
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Service scaled-down to $BASE_SCALE instance(s)!"
@@ -453,7 +453,7 @@ for i in $(seq "$BASE_ITERATION" "$ITERATIONS"); do
     if [ "$FORCE_CLEANUP" == "true" ]; then
         TIMEOUT_SECONDS=90
         ELAPSED=0
-        while [ $(kubectl get pods --no-headers | { grep "^rnn-serving-python" || true; } | { grep "Running" || true; } | wc -l) -ne $((BASE_SCALE*NUMBER_OF_SERVICES)) ]; do
+        while [ $(kubectl get pods --no-headers | { grep "^video-processing-python" || true; } | { grep "Running" || true; } | wc -l) -ne $((BASE_SCALE*NUMBER_OF_SERVICES)) ]; do
             if [ $ELAPSED -ge $TIMEOUT_SECONDS ]; then
                 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Timeout waiting for pods to enter Terminating state"
                 break
@@ -461,7 +461,7 @@ for i in $(seq "$BASE_ITERATION" "$ITERATIONS"); do
             sleep 2
             ELAPSED=$((ELAPSED + 2))
         done
-        TERMINATING_PODS=$(kubectl get pods --no-headers | { grep "^rnn-serving-python" || true; } | { grep "Terminating" || true; } | awk '{print $1}')
+        TERMINATING_PODS=$(kubectl get pods --no-headers | { grep "^video-processing-python" || true; } | { grep "Terminating" || true; } | awk '{print $1}')
 
         for pod in $TERMINATING_PODS; do
             kubectl delete pod "$pod" --grace-period=0 --force &>/dev/null || true
@@ -469,7 +469,7 @@ for i in $(seq "$BASE_ITERATION" "$ITERATIONS"); do
     fi
     
     for j in $(seq 1 "$NUMBER_OF_SERVICES"); do
-        while [ $(kubectl get pods --no-headers | { grep "^rnn-serving-python-$j" || true; } | wc -l) -gt $BASE_SCALE ]; do
+        while [ $(kubectl get pods --no-headers | { grep "^video-processing-python-$j" || true; } | wc -l) -gt $BASE_SCALE ]; do
             sleep 2
         done
     done
@@ -510,7 +510,7 @@ for i in $(seq "$BASE_ITERATION" "$ITERATIONS"); do
             mv $INVOKER_PATH/invoker-output.log $SERVICE_PATH/iteration_${i}_invoker-output.log && \
             cat > $SERVICE_PATH/iteration_${i}_status.txt <<EOF
 ================================================
-vSwarm RNN Benchmark Status - Iteration $i
+vSwarm Video Processing Benchmark Status - Iteration $i
 ================================================
 Issued: $ISSUED
 Completed: $COMPLETED
@@ -545,14 +545,14 @@ for i in $(seq 1 "$NUMBER_OF_SERVICES"); do
     kubectl delete -f "$SERVICE_MANIFEST" &>/dev/null
 done
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for all rnn-serving-python pods to terminate..."
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for all video-processing-python pods to terminate..."
 if [ "$FORCE_CLEANUP" == "true" ]; then
-    while [ $(kubectl get pods --no-headers | { grep "^rnn-serving-python" || true; } | wc -l) -gt 0 ]; do
-        kubectl get pods --no-headers | { grep "^rnn-serving-python" || true; } | awk '{print $1}' | xargs -r kubectl delete pod --grace-period=0 --force 2>/dev/null 2>&1 || true
+    while [ $(kubectl get pods --no-headers | { grep "^video-processing-python" || true; } | wc -l) -gt 0 ]; do
+        kubectl get pods --no-headers | { grep "^video-processing-python" || true; } | awk '{print $1}' | xargs -r kubectl delete pod --grace-period=0 --force 2>/dev/null 2>&1 || true
         sleep 2
     done
 else
-    while [ $(kubectl get pods --no-headers | { grep "^rnn-serving-python" || true; } | wc -l) -gt 0 ]; do
+    while [ $(kubectl get pods --no-headers | { grep "^video-processing-python" || true; } | wc -l) -gt 0 ]; do
         sleep 2
     done
 fi
