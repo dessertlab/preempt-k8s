@@ -8,3 +8,6 @@ target
 # Cache Files
 *.pyc
 *__pycache__/
+
+# Tutorial
+*tutorial

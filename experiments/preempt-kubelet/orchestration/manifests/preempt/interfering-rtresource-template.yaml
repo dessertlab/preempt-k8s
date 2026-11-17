@@ -1,0 +1,28 @@
+apiVersion: rtgroup.critical.com/v1
+kind: RTResource
+metadata:
+  name: interfering-rtresource-${RT_NUM}
+  namespace: ${NAMESPACE}
+  labels:
+    app: interfering-rtresource-${RT_NUM}
+spec:
+  namespace: ${NAMESPACE}
+  replicas: 1
+  selector:
+    matchLabels:
+      app: interfering-rtresource-${RT_NUM}
+  criticality: ${CRITICALITY_LEVEL}
+  template:
+    metadata:
+      name: interfering-pod-${RT_NUM}
+      namespace: ${NAMESPACE}
+      labels:
+        app: interfering-rtresource-${RT_NUM}
+    spec:
+      terminationGracePeriodSeconds: 0
+      nodeSelector:
+        kubernetes.io/hostname: ${NODE}
+      containers:
+        - name: interfering-container
+          image: registry.k8s.io/pause:3.10
+          imagePullPolicy: Never

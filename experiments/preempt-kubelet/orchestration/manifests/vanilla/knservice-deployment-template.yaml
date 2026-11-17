@@ -1,0 +1,26 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: knservice-deployment-${DP_NUM}
+  namespace: ${NAMESPACE}
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "1"
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: NotIn
+                    values:
+                      - ${NON_FEASIBLE_NODE_1}
+                      - ${NON_FEASIBLE_NODE_2}
+      containers:
+        - name: knservice-container
+          image: registry.k8s.io/pause:3.10
+          imagePullPolicy: Never
