@@ -8,14 +8,16 @@ set -u
 set -o pipefail
 
 # Default values and working variables
-EXPERIMENT_NAME="orchestration"
-TEST_TYPE="Deployment"
-KUBELET_TYPE="Vanilla"
+EXPERIMENT_NAME=""
 NAMESPACE="default"
-NUMBER_OF_SERVICES="5"
+NUMBER_OF_SERVICES="10"
 ITERATIONS="30"
 OFFSET="0"
-NUMBER_OF_INTERFERING_RESOURCES="80"
+NUMBER_OF_INTERFERING_RESOURCES="70"
+DEPLOY_STRESS="false"
+
+RT_CONTROLLER_NAMESPACE="realtime"
+RT_CONTROLLER_POD="preempt-k8s-0"
 
 LOKI_NAMESPACE="observability"
 LOKI_NAME="loki"
@@ -31,42 +33,39 @@ KSVC_RTRESOURCE_TEMPLATE="$RTRESOURCE_MANIFEST_DIR/knservice-rtresource-template
 INTERFERING_RTRESOURCE_TEMPLATE="$RTRESOURCE_MANIFEST_DIR/interfering-rtresource-template.yaml"
 
 NODE="dessertw2"
-LIST_OF_NON_FEASIBLE_NODES=("dessertw1" "dessertw3")
+NODE_IP=""
+ANALYSIS_SCRIPT="/root/analyze-bands-feature.py"
 
-KSVC_CRITICALITY="1"
-INTERFERENCE_CRITICALITY="2"
+WINDOW_MARGIN=20
+RUNNING_TIMEOUT=60
 
 # Parse command line flags
-while getopts ":e:t:k:n:s:i:o:r:l:q:p:f:h" opt; do
+while getopts ":e:n:s:i:o:r:c:l:q:p:h" opt; do
     case $opt in
         e) EXPERIMENT_NAME="$OPTARG" ;;
-        t) TEST_TYPE="$OPTARG" ;;
-        k) KUBELET_TYPE="$OPTARG" ;;
         n) NAMESPACE="$OPTARG" ;;
         s) NUMBER_OF_SERVICES="$OPTARG" ;;
         i) ITERATIONS="$OPTARG" ;;
         o) OFFSET="$OPTARG" ;;
         r) NUMBER_OF_INTERFERING_RESOURCES="$OPTARG" ;;
+        c) DEPLOY_STRESS="$OPTARG" ;;
         l) LOKI_NAMESPACE="$OPTARG" ;;
         q) LOKI_NAME="$OPTARG" ;;
         p) NODE="$OPTARG" ;;
-        f) IFS=',' read -r -a LIST_OF_NON_FEASIBLE_NODES <<< "$OPTARG" ;;
         h) 
             echo "Usage: $0 [OPTIONS]"
             echo ""
             echo "Options:"
-            echo "  -e <experiment-name>                Name of the experiment (default: orchestration)"
-            echo "  -t <test-type>                      Type of test to run (default: Deployment)"
-            echo "  -k <kubelet-type>                   Type of Kubelet to use (default: Vanilla)"
+            echo "  -e <experiment-name>                Name of the experiment, required when resuming an experiment [-o] (default: current timestamp)"
             echo "  -n <namespace>                      Namespace where services and interfering resources are deployed (default: default)"
-            echo "  -s <number-of-services>             Number of concurrent services to deploy (default: 5)"
+            echo "  -s <number-of-services>             Number of concurrent services to deploy (default: 10)"
             echo "  -i <iterations>                     Number of test iterations (default: 30)"
             echo "  -o <offset>                         Iterations offset (default: 0)"
-            echo "  -r <number-of-resources>            Number of interfering resources (default: 80)"
+            echo "  -r <number-of-resources>            Number of interfering resources (default: 70)"
+            echo "  -c <deploy-stress>                  Set to true to deploy CPU stress both on the control plane and the experiment worker NODE (default: false)"
             echo "  -l <loki-namespace>                 Namespace where the Loki service is deployed (default: observability)"
             echo "  -q <loki-name>                      Name of the Loki service (default: loki)"
             echo "  -p <node>                           Node where services and the interfering resources should be scheduled (default: dessertw2)"
-            echo "  -f <list-of-non-feasible-nodes>     List of nodes where services should not be scheduled (default: dessertw1,dessertw3)"
             echo "  -h                                  Show this help message"
             exit 0
             ;;
@@ -81,18 +80,6 @@ while getopts ":e:t:k:n:s:i:o:r:l:q:p:f:h" opt; do
             ;;
     esac
 done
-
-# Validate test type
-if [[ "$TEST_TYPE" != "Deployment" && "$TEST_TYPE" != "RTResource" ]]; then
-    echo "Error: Test type must be either 'Deployment' or 'RTResource' (got: $TEST_TYPE)" >&2
-    exit 1
-fi
-
-# Validate kubelet type
-if [[ "$KUBELET_TYPE" != "Vanilla" && "$KUBELET_TYPE" != "Preemptive" ]]; then
-    echo "Error: Kubelet type must be either 'Vanilla' or 'Preemptive' (got: $KUBELET_TYPE)" >&2
-    exit 1
-fi
 
 # Validate experiment namespace
 if ! kubectl get namespace "$NAMESPACE" &>/dev/null; then
@@ -121,6 +108,12 @@ fi
 # Validate number of interfering resources is a non-negative number
 if ! [[ "$NUMBER_OF_INTERFERING_RESOURCES" =~ ^[0-9]+$ ]] || [[ "$NUMBER_OF_INTERFERING_RESOURCES" -lt 0 ]]; then
     echo "Error: Number of interfering resources must be a non-negative number (got: $NUMBER_OF_INTERFERING_RESOURCES)" >&2
+    exit 1
+fi
+
+# Validate deploy stress is either true or false
+if [[ "$DEPLOY_STRESS" != "true" && "$DEPLOY_STRESS" != "false" ]]; then
+    echo "Error: Deploy stress must be either 'true' or 'false' (got: $DEPLOY_STRESS)" >&2
     exit 1
 fi
 
@@ -154,18 +147,15 @@ if ! kubectl get node "$NODE" &>/dev/null; then
     echo "Error: Experiment node '$NODE' does not exist in the cluster" >&2
     exit 1
 fi
-
-# Validate list of non-feasible nodes
-if [[ "${#LIST_OF_NON_FEASIBLE_NODES[@]}" -ne 2 ]]; then
-    echo "Error: Two non-feasible nodes must be specified (got: ${#LIST_OF_NON_FEASIBLE_NODES[@]})" >&2
+NODE_IP=$(kubectl get node "$NODE" -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}')
+if [ -z "$NODE_IP" ]; then
+    echo "Error: Failed to retrieve the InternalIP address of node '$NODE'" >&2
     exit 1
 fi
-for NF_NODE in "${LIST_OF_NON_FEASIBLE_NODES[@]}"; do
-    if ! kubectl get node "$NF_NODE" &>/dev/null; then
-        echo "Error: Non-feasible node '$NF_NODE' does not exist in the cluster" >&2
-        exit 1
-    fi
-done
+if ! ssh -o BatchMode=yes root@"$NODE_IP" "test -f $ANALYSIS_SCRIPT && command -v python3" &>/dev/null; then
+    echo "Error: '$ANALYSIS_SCRIPT' or python3 not found on node '$NODE'" >&2
+    exit 1
+fi
 
 # Validate envsubst availability (package: gettext-base)
 if ! command -v envsubst &>/dev/null; then
@@ -179,6 +169,79 @@ if ! command -v jq &>/dev/null; then
     exit 1
 fi
 
+# Ensure stress-ng is installed on control plane and experiment nodes
+if [ "$DEPLOY_STRESS" == "true" ]; then
+    if ! command -v stress-ng &>/dev/null; then
+        echo "Error: stress-ng is not installed on the control plane node, please install it to run the cpu interfering load" >&2
+        exit 1
+    fi
+    if ! ssh root@"${NODE_IP}" 'command -v stress-ng' &>/dev/null; then
+        echo "Error: stress-ng is not installed on the experiment worker node" >&2
+        exit 1
+    fi
+fi
+
+# Detect test configuration
+RT_CONTROLLER_PHASE=$(kubectl get pod "$RT_CONTROLLER_POD" -n "$RT_CONTROLLER_NAMESPACE" \
+    -o jsonpath='{.status.phase}' 2>/dev/null || true)
+if [ "$RT_CONTROLLER_PHASE" == "Running" ]; then
+    TEST_TYPE="RTResource"
+else
+    TEST_TYPE="Deployment"
+fi
+
+KUBELET_CONFIG=$(kubectl get --raw "/api/v1/nodes/$NODE/proxy/configz" | jq '.kubeletconfig')
+BANDS_ENABLED=$(jq -r '.criticalityBands.enabled // false' <<< "$KUBELET_CONFIG")
+STEALING_ENABLED="false"
+if [ "$BANDS_ENABLED" == "true" ]; then
+    STEALING_ENABLED=$(jq -r '.criticalityBands.stealing // false' <<< "$KUBELET_CONFIG")
+fi
+FIFO_ENABLED=$(jq -r '.fifoScheduling // false' <<< "$KUBELET_CONFIG")
+CRITICALITY_LABEL_KEY=$(jq -r '.criticality.labelKey // "-"' <<< "$KUBELET_CONFIG")
+MAX_CRITICALITY_LEVEL=$(jq -r '.criticality.maxLevel // "-"' <<< "$KUBELET_CONFIG")
+MIN_CRITICALITY_LEVEL=$(jq -r '.criticality.minLevel // "-"' <<< "$KUBELET_CONFIG")
+MAX_CONCURRENT_POD_CREATIONS=$(jq -r '.criticalityBands.maxConcurrentPodCreations // "-"' <<< "$KUBELET_CONFIG")
+HIGH_BAND_MIN_LEVEL=$(jq -r '.criticalityBands.highBandMinLevel // "-"' <<< "$KUBELET_CONFIG")
+HIGH_BAND_GUARANTEED=$(jq -r '.criticalityBands.highBandGuaranteed // "-"' <<< "$KUBELET_CONFIG")
+MEDIUM_BAND_MIN_LEVEL=$(jq -r '.criticalityBands.mediumBandMinLevel // "-"' <<< "$KUBELET_CONFIG")
+MEDIUM_BAND_GUARANTEED=$(jq -r '.criticalityBands.mediumBandGuaranteed // "-"' <<< "$KUBELET_CONFIG")
+KUBELET_VERBOSITY=$(jq -r '.logging.verbosity // 0' <<< "$KUBELET_CONFIG")
+
+for var in CRITICALITY_LABEL_KEY MAX_CRITICALITY_LEVEL MIN_CRITICALITY_LEVEL \
+           MAX_CONCURRENT_POD_CREATIONS \
+           HIGH_BAND_MIN_LEVEL HIGH_BAND_GUARANTEED \
+           MEDIUM_BAND_MIN_LEVEL MEDIUM_BAND_GUARANTEED; do
+    if [ "${!var}" == "-" ]; then
+        echo "Error: Kubelet on node '$NODE' does not expose '$var' (is it the Preemptive Kubelet build?)" >&2
+        exit 1
+    fi
+done
+
+if [[ "$BANDS_ENABLED" == "true" || "$FIFO_ENABLED" == "true" ]]; then
+    KUBELET_TYPE="Preemptive"
+else
+    KUBELET_TYPE="Vanilla"
+fi
+
+if [ "$TEST_TYPE" == "Deployment" ] && [ "$KUBELET_TYPE" == "Preemptive" ]; then
+    echo "Error: Deployment test requires the Vanilla Kubelet, but node '$NODE' runs the Preemptive Kubelet" >&2
+    exit 1
+fi
+
+if [ "$KUBELET_VERBOSITY" -lt 4 ]; then
+    echo "Error: Kubelet log verbosity on node '$NODE' is $KUBELET_VERBOSITY, at least 4 is required (set logging.verbosity in the Kubelet config)" >&2
+    exit 1
+fi
+
+# Experiment name generation
+if [ "$OFFSET" -gt 0 ] && [ -z "$EXPERIMENT_NAME" ]; then
+    echo "Error: Experiment name [-e] is required to resume an experiment with offset $OFFSET" >&2
+    exit 1
+fi
+if [ -z "$EXPERIMENT_NAME" ]; then
+    EXPERIMENT_NAME="$(date '+%Y-%m-%d_%H-%M-%S')"
+fi
+
 ################ UTILITY FUNCTIONS ################
 
 # Render a template into a manifest
@@ -188,10 +251,8 @@ render_manifest() {
     env "$NUM_VAR=$num" \
         NAMESPACE="$NAMESPACE" \
         NODE="$NODE" \
-        NON_FEASIBLE_NODE_1="${LIST_OF_NON_FEASIBLE_NODES[0]}" \
-        NON_FEASIBLE_NODE_2="${LIST_OF_NON_FEASIBLE_NODES[1]}" \
         CRITICALITY_LEVEL="$criticality" \
-        envsubst '${DP_NUM} ${RT_NUM} ${NAMESPACE} ${NODE} ${NON_FEASIBLE_NODE_1} ${NON_FEASIBLE_NODE_2} ${CRITICALITY_LEVEL}' \
+        envsubst '${DP_NUM} ${RT_NUM} ${NAMESPACE} ${NODE} ${CRITICALITY_LEVEL}' \
         < "$template" > "$output"
 }
 
@@ -207,21 +268,43 @@ echo "================================================"
 echo "Experiment Name: $EXPERIMENT_NAME"
 echo "Test Type: $TEST_TYPE"
 echo "Kubelet Type: $KUBELET_TYPE"
+if [ "$KUBELET_TYPE" == "Preemptive" ]; then
+    echo "Priority Bands Feature Status: $BANDS_ENABLED"
+    echo "Priority Bands Stealing Feature Status: $STEALING_ENABLED"
+    echo "Pod Worker FIFO Scheduling Feature Status: $FIFO_ENABLED"
+    echo "Criticality Label: $CRITICALITY_LABEL_KEY"
+    echo "Criticality Maximum Level: $MAX_CRITICALITY_LEVEL"
+    echo "Criticality Minimum Level: $MIN_CRITICALITY_LEVEL"
+    if [ "$BANDS_ENABLED" == "true" ]; then
+        echo "Number of Concurrent Pod Creations allowed: $MAX_CONCURRENT_POD_CREATIONS"
+        echo "High Priority Band range: ${MAX_CRITICALITY_LEVEL}-${HIGH_BAND_MIN_LEVEL}"
+        echo "Minimum Number of Concurrent Creations granted to the High Priority Band: $HIGH_BAND_GUARANTEED"
+        echo "Medium Priority Band range: $((HIGH_BAND_MIN_LEVEL + 1))-${MEDIUM_BAND_MIN_LEVEL}"
+        echo "Minimum Number of Concurrent Creations granted to the Medium Priority Band: $MEDIUM_BAND_GUARANTEED"
+        echo "Low Priority Band range: $((MEDIUM_BAND_MIN_LEVEL + 1))-${MIN_CRITICALITY_LEVEL}"
+    fi
+fi
 echo "Namespace: $NAMESPACE"
 echo "Number of Services: $NUMBER_OF_SERVICES"
 echo "Iterations: $ITERATIONS"
 echo "Offset: $OFFSET"
 echo "Number of Interfering Resources: $NUMBER_OF_INTERFERING_RESOURCES"
+echo "Deploy Stress: $DEPLOY_STRESS"
+echo "Preempt-K8s Controller Namespace: $RT_CONTROLLER_NAMESPACE"
+echo "Preempt-K8s Controller Pod Name: $RT_CONTROLLER_POD"
 echo "Loki Namespace: $LOKI_NAMESPACE"
 echo "Loki Name: $LOKI_NAME"
 echo "Experiment Node: $NODE"
-echo "List of Non-Feasible Nodes: ${LIST_OF_NON_FEASIBLE_NODES[*]}"
-echo "KSVC Criticality Level: $KSVC_CRITICALITY"
-echo "Interference Criticality Level: $INTERFERENCE_CRITICALITY"
+echo "Kubelet Logs Verbosity Level: $KUBELET_VERBOSITY"
 echo "================================================"
 echo ""
 
 # Manifest generation
+LEVEL_MOST_CRITICAL="$MAX_CRITICALITY_LEVEL"
+LEVEL_HIGH_LAST="$HIGH_BAND_MIN_LEVEL"
+LEVEL_MEDIUM_LAST="$MEDIUM_BAND_MIN_LEVEL"
+LEVEL_LEAST_CRITICAL="$MIN_CRITICALITY_LEVEL"
+
 echo "Generating manifests..."
 INTERFERING_MANIFESTS=()
 KSVC_MANIFESTS=()
@@ -239,17 +322,31 @@ INTERFERING_DIR=$(dirname "$INTERFERING_TEMPLATE")
 KSVC_DIR=$(dirname "$KSVC_TEMPLATE")
 INTERFERING_PREFIX=$(basename "$INTERFERING_TEMPLATE" -template.yaml)
 KSVC_PREFIX=$(basename "$KSVC_TEMPLATE" -template.yaml)
+
+SEED=42
+RANDOM=$SEED
+
+HIGH_BAND_LEVELS=$((LEVEL_HIGH_LAST - LEVEL_MOST_CRITICAL + 1))
+for j in $(seq 1 "$NUMBER_OF_SERVICES"); do
+    level=$((LEVEL_MOST_CRITICAL + (j - 1) % HIGH_BAND_LEVELS))
+    f="$KSVC_DIR/$KSVC_PREFIX-$j.yaml"
+    render_manifest "$KSVC_TEMPLATE" "$f" "$j" "$level"
+    KSVC_MANIFESTS+=("$f")
+    KSVC_NAMES+=("$KSVC_PREFIX-$level-$j")
+done
+
+MEDIUM_INTERFERING=$((NUMBER_OF_INTERFERING_RESOURCES / 2))
 for j in $(seq 1 "$NUMBER_OF_INTERFERING_RESOURCES"); do
+    if [ "$j" -le "$MEDIUM_INTERFERING" ]; then
+        level=$((LEVEL_HIGH_LAST + 1 + RANDOM % (LEVEL_MEDIUM_LAST - LEVEL_HIGH_LAST)))
+    else
+        level=$((LEVEL_MEDIUM_LAST + 1 + RANDOM % (LEVEL_LEAST_CRITICAL - LEVEL_MEDIUM_LAST)))
+    fi
     f="$INTERFERING_DIR/$INTERFERING_PREFIX-$j.yaml"
-    render_manifest "$INTERFERING_TEMPLATE" "$f" "$j" "$INTERFERENCE_CRITICALITY"
+    render_manifest "$INTERFERING_TEMPLATE" "$f" "$j" "$level"
     INTERFERING_MANIFESTS+=("$f")
 done
-for j in $(seq 1 "$NUMBER_OF_SERVICES"); do
-    f="$KSVC_DIR/$KSVC_PREFIX-$j.yaml"
-    render_manifest "$KSVC_TEMPLATE" "$f" "$j" "$KSVC_CRITICALITY"
-    KSVC_MANIFESTS+=("$f")
-    KSVC_NAMES+=("$KSVC_PREFIX-$j")
-done
+
 ALL_MANIFESTS=("${INTERFERING_MANIFESTS[@]}" "${KSVC_MANIFESTS[@]}")
 echo "Generated ${#INTERFERING_MANIFESTS[@]} interfering and ${#KSVC_MANIFESTS[@]} KSVC manifests!"
 echo ""
@@ -267,6 +364,17 @@ else
     KUBELET_DIR="preemptive"
 fi
 RESULTS_DIR="/experiments/kubelet/$CONTROLLER_DIR/$KUBELET_DIR/${EXPERIMENT_NAME}"
+if [ "$OFFSET" -gt 0 ]; then
+    if ! kubectl exec "$QUERY_POD_NAME" -n "$NAMESPACE" -- test -f "$RESULTS_DIR/config.txt"; then
+        echo "Error: Experiment '$EXPERIMENT_NAME' not found in '$RESULTS_DIR' (missing config.txt)" >&2
+        exit 1
+    fi
+else
+    if kubectl exec "$QUERY_POD_NAME" -n "$NAMESPACE" -- test -e "$RESULTS_DIR"; then
+        echo "Error: Results directory '$RESULTS_DIR' already exists" >&2
+        exit 1
+    fi
+fi
 kubectl exec "$QUERY_POD_NAME" -n "$NAMESPACE" -- mkdir -p "$RESULTS_DIR"
 echo "Results will be stored in: $RESULTS_DIR"
 echo ""
@@ -274,7 +382,7 @@ echo ""
 # Save configuration to file in the pod
 if [ "$OFFSET" -eq 0 ]; then
     echo "Saving test configuration..."
-    kubectl exec "$QUERY_POD_NAME" -n "$NAMESPACE" -- bash -c "
+    kubectl exec "$QUERY_POD_NAME" -n "$NAMESPACE" -- sh -c "
         cat > $RESULTS_DIR/config.txt <<EOF
 ================================================
 Orchestration Benchmark - Test Configuration
@@ -282,14 +390,33 @@ Orchestration Benchmark - Test Configuration
 Experiment Name: $EXPERIMENT_NAME
 Test Type: $TEST_TYPE
 Kubelet Type: $KUBELET_TYPE
+$(if [ "$KUBELET_TYPE" == "Preemptive" ]; then
+    echo "Priority Bands Feature Status: $BANDS_ENABLED"
+    echo "Priority Bands Stealing Feature Status: $STEALING_ENABLED"
+    echo "Pod Worker FIFO Scheduling Feature Status: $FIFO_ENABLED"
+    echo "Criticality Label: $CRITICALITY_LABEL_KEY"
+    echo "Criticality Maximum Level: $MAX_CRITICALITY_LEVEL"
+    echo "Criticality Minimum Level: $MIN_CRITICALITY_LEVEL"
+    if [ "$BANDS_ENABLED" == "true" ]; then
+        echo "Number of Concurrent Pod Creations allowed: $MAX_CONCURRENT_POD_CREATIONS"
+        echo "High Priority Band range: ${MAX_CRITICALITY_LEVEL}-${HIGH_BAND_MIN_LEVEL}"
+        echo "Minimum Number of Concurrent Creations granted to the High Priority Band: $HIGH_BAND_GUARANTEED"
+        echo "Medium Priority Band range: $((HIGH_BAND_MIN_LEVEL + 1))-${MEDIUM_BAND_MIN_LEVEL}"
+        echo "Minimum Number of Concurrent Creations granted to the Medium Priority Band: $MEDIUM_BAND_GUARANTEED"
+        echo "Low Priority Band range: $((MEDIUM_BAND_MIN_LEVEL + 1))-${MIN_CRITICALITY_LEVEL}"
+    fi
+fi)
 Namespace: $NAMESPACE
 Number of Services: $NUMBER_OF_SERVICES
 Iterations: $ITERATIONS
 Number of Interfering Resources: $NUMBER_OF_INTERFERING_RESOURCES
-Node: $NODE
-List of Non-Feasible Nodes: ${LIST_OF_NON_FEASIBLE_NODES[*]}
-KSVC Criticality Level: $KSVC_CRITICALITY
-Interference Criticality Level: $INTERFERENCE_CRITICALITY
+Deploy Stress: $DEPLOY_STRESS
+Preempt-K8s Controller Namespace: $RT_CONTROLLER_NAMESPACE
+Preempt-K8s Controller Pod Name: $RT_CONTROLLER_POD
+Loki Namespace: $LOKI_NAMESPACE
+Loki Name: $LOKI_NAME
+Experiment Node: $NODE
+Kubelet Logs Verbosity Level: $KUBELET_VERBOSITY
 ================================================
 EOF
 "
@@ -306,6 +433,18 @@ for i in $(seq "$BASE_ITERATION" "$ITERATIONS"); do
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting test iteration $i of $ITERATIONS"
     echo "------------------------------------------------"
 
+    # We run the stress-ng cpu interference in the control plane and the experiment worker node
+    if [ "$DEPLOY_STRESS" == "true" ]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting cpu interference load on control plane..."
+        CP_CPUS=$(nproc)
+        stress-ng --cpu $(( CP_CPUS > 1 ? CP_CPUS - 1 : 1 )) &>/dev/null &
+        CPU_STRESS_PID=$!
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting cpu interference load on experiment worker node..."
+        NODE_CPU_STRESS_PID=$(ssh root@"${NODE_IP}" \
+            'n=$(nproc); [ "$n" -gt 1 ] && n=$((n - 1)); nohup stress-ng --cpu "$n" >/dev/null 2>&1 & echo $!')
+        sleep 10
+    fi
+
     # Deploy all resources (interfering and KSVCs)
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deploying all resources..."
     mapfile -t SHUFFLED_MANIFESTS < <(printf '%s\n' "${ALL_MANIFESTS[@]}" | shuf)
@@ -317,28 +456,30 @@ for i in $(seq "$BASE_ITERATION" "$ITERATIONS"); do
         fi
     done
     START_TIME=$(date +%s%N)
-    sleep 20
+    sleep "$WINDOW_MARGIN"
+    APPLY_PIDS=()
     for f in "${SHUFFLED_MANIFESTS[@]}"; do
-        kubectl apply -f "$f" >/dev/null &
+        kubectl apply -f "$f" &>/dev/null &
+        APPLY_PIDS+=($!)
     done
-    wait
+    wait "${APPLY_PIDS[@]}" || true
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] All resources deployed! KSVC positions: ${KSVC_POSITIONS[*]}"
     
-    #  Wait for all KSVCs to be ready
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for all KSVCs to be ready..."
+    # Wait for all pods (KSVCs and interfering) to be running
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for all pods to be running..."
     KSVC_SELECTOR="serving.knative.dev/service in ($(IFS=,; echo "${KSVC_NAMES[*]}"))"
-    TIMEOUT=30
-    DEADLINE=$((SECONDS + TIMEOUT))
+    EXPECTED_PODS=$((NUMBER_OF_SERVICES + NUMBER_OF_INTERFERING_RESOURCES + 1))
+    DEADLINE=$((SECONDS + RUNNING_TIMEOUT))
     while true; do
-        RUNNING=$({ kubectl get pods -n "$NAMESPACE" -l "$KSVC_SELECTOR" \
+        RUNNING=$({ kubectl get pods -n "$NAMESPACE" \
             --field-selector=status.phase=Running --no-headers 2>/dev/null || true; } | wc -l)
-        if [ "$RUNNING" -eq "$NUMBER_OF_SERVICES" ]; then
-            sleep 20
+        if [ "$RUNNING" -eq "$EXPECTED_PODS" ]; then
+            sleep "$WINDOW_MARGIN"
             END_TIME=$(date +%s%N)
             break
         fi
         if [ "$SECONDS" -ge "$DEADLINE" ]; then
-            echo "Error: only $RUNNING of $NUMBER_OF_SERVICES KSVC pods running after ${TIMEOUT}s in iteration $i" >&2
+            echo "Error: only $RUNNING of $EXPECTED_PODS pods running after ${RUNNING_TIMEOUT}s in iteration $i" >&2
             echo "Iteration $i discarded!"
             if [ "$i" -gt 1 ]; then
                 echo "Partial results saved to $RESULTS_DIR"
@@ -347,25 +488,22 @@ for i in $(seq "$BASE_ITERATION" "$ITERATIONS"); do
         fi
         sleep 1
     done
-    EXPECTED_PODS=$(( ${NUMBER_OF_SERVICES} + ${NUMBER_OF_INTERFERING_RESOURCES} + 1 ))
-    TOTAL_PODS=$({ kubectl get pods -n "$NAMESPACE" --no-headers 2>/dev/null || true; } | wc -l)
-    if [ "$TOTAL_PODS" -ne "$EXPECTED_PODS" ]; then
-        echo "Error: found $TOTAL_PODS pods in namespace '$NAMESPACE', expected $EXPECTED_PODS in iteration $i" >&2
-        echo "Iteration $i discarded!"
-        if [ "$i" -gt 1 ]; then
-            echo "Partial results saved to $RESULTS_DIR"
-        fi
-        exit 1
-    fi
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] All KSVCs are running!"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] All pods are running!"
 
-    # Iteration cleanup: delete all resources (interfering and KSVCs)
+    # Iteration clean up: cpu interfering load on control plane and experiment worker node
+    if [ "$DEPLOY_STRESS" == "true" ]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Stopping cpu interference load on control plane and experiment worker node..."
+        kill "$CPU_STRESS_PID" 2>/dev/null || true
+        ssh root@"${NODE_IP}" "kill $NODE_CPU_STRESS_PID" 2>/dev/null || true
+    fi
+
+    # Iteration clean up: delete all resources (interfering and KSVCs)
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Cleaning up iteration resources..."
     DELETE_ARGS=()
     for f in "${ALL_MANIFESTS[@]}"; do
         DELETE_ARGS+=(-f "$f")
     done
-    kubectl delete "${DELETE_ARGS[@]}" --ignore-not-found --wait=false >/dev/null
+    kubectl delete "${DELETE_ARGS[@]}" --ignore-not-found --wait=false &>/dev/null
     CLEANUP_TIMEOUT=60
     DEADLINE=$((SECONDS + CLEANUP_TIMEOUT))
     while true; do
@@ -388,30 +526,49 @@ for i in $(seq "$BASE_ITERATION" "$ITERATIONS"); do
     done
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Cleanup completed!"
 
+    # Local directory collecting all the results of the iteration
+    ITERATION_DIR="iteration-${i}"
+    mkdir -p "./$ITERATION_DIR"
+
     # We query Loki to retrieve control plane logs and save them to persistent storage
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Querying Loki for control plane logs..."
     LOKI_QUERY="{job=\"kubernetes-audit\"} | json "
-    LOKI_OUTPUT_FILE="loki-logs-iteration_${i}.json"
     curl -G -sSf "http://${LOKI_IP_ADDRESS}:3100/loki/api/v1/query_range" \
         --data-urlencode "query=$LOKI_QUERY" \
         --data-urlencode "start=$START_TIME" \
         --data-urlencode "end=$END_TIME" \
-        --data-urlencode "limit=5000" \
+        --data-urlencode "limit=1000000" \
         --data-urlencode "direction=forward" | \
         jq '[.data.result[].values[] | {
         timestamp: .[0],
         log: (.[1] | fromjson)
-        }] | sort_by(.timestamp)' > "./$LOKI_OUTPUT_FILE"
-    kubectl cp ./"${LOKI_OUTPUT_FILE}" "${NAMESPACE}/${QUERY_POD_NAME}:${RESULTS_DIR}/${LOKI_OUTPUT_FILE}" >/dev/null 2>&1
-    rm ./"${LOKI_OUTPUT_FILE}"
+        }] | sort_by(.timestamp)' > "./$ITERATION_DIR/loki-logs.json"
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Loki logs retrieved!"
+
+    # We analyze the Kubelet logs on the experiment node and save the results to persistent storage
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Analyzing Kubelet logs on experiment node..."
+    ANALYSIS_FOLDER="kubelet-logs"
+    ANALYSIS_NODE_DIR="/root/kubelet-patch-analysis/${ANALYSIS_FOLDER}"
+    KUBELET_LOGS_SINCE=$(date -d "@$(( START_TIME / 1000000000 ))" '+%Y-%m-%d %H:%M:%S')
+    KUBELET_LOGS_UNTIL=$(date -d "@$(( END_TIME / 1000000000 ))" '+%Y-%m-%d %H:%M:%S')
+    ssh -o BatchMode=yes root@"$NODE_IP" "cd /root && python3 '$ANALYSIS_SCRIPT' \
+        -r '$ANALYSIS_FOLDER' -s '$KUBELET_LOGS_SINCE' -u '$KUBELET_LOGS_UNTIL' \
+        -n '$MAX_CONCURRENT_POD_CREATIONS' -g '$HIGH_BAND_GUARANTEED,$MEDIUM_BAND_GUARANTEED' \
+        -b '$HIGH_BAND_MIN_LEVEL,$MEDIUM_BAND_MIN_LEVEL' -t '$STEALING_ENABLED'" >/dev/null
+    scp -r -o BatchMode=yes root@"$NODE_IP":"$ANALYSIS_NODE_DIR/*" "./$ITERATION_DIR/" >/dev/null
+    ssh -o BatchMode=yes root@"$NODE_IP" "rm -rf '$ANALYSIS_NODE_DIR'"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Kubelet logs analyzed!"
+
+    # We save all the results of the iteration to persistent storage
+    kubectl cp "./$ITERATION_DIR" "${NAMESPACE}/${QUERY_POD_NAME}:${RESULTS_DIR}/${ITERATION_DIR}" >/dev/null
+    rm -rf "./$ITERATION_DIR"
 
     # Page cache flush on all nodes to minimize the effect of caching on subsequent iterations
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Flushing page cache on all nodes..."
 
     sync; echo 3 | sudo tee /proc/sys/vm/drop_caches >/dev/null 2>&1
     ssh root@143.225.229.231 "sync; echo 3 | sudo tee /proc/sys/vm/drop_caches" >/dev/null 2>&1
-    ssh root@143.225.229.232 "sync; echo 3 | sudo tee /proc/sys/vm/drop_caches" >/dev/null 2>&1
+    ssh root@"${NODE_IP}" "sync; echo 3 | sudo tee /proc/sys/vm/drop_caches" >/dev/null 2>&1
     ssh root@143.225.229.233 "sync; echo 3 | sudo tee /proc/sys/vm/drop_caches" >/dev/null 2>&1
 
     # Iteration completed, results saved

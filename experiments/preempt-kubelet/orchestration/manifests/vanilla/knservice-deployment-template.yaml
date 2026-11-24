@@ -1,7 +1,7 @@
 apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:
-  name: knservice-deployment-${DP_NUM}
+  name: knservice-deployment-${CRITICALITY_LEVEL}-${DP_NUM}
   namespace: ${NAMESPACE}
 spec:
   template:
@@ -16,10 +16,9 @@ spec:
             nodeSelectorTerms:
               - matchExpressions:
                   - key: kubernetes.io/hostname
-                    operator: NotIn
+                    operator: In
                     values:
-                      - ${NON_FEASIBLE_NODE_1}
-                      - ${NON_FEASIBLE_NODE_2}
+                      - ${NODE}
       containers:
         - name: knservice-container
           image: registry.k8s.io/pause:3.10

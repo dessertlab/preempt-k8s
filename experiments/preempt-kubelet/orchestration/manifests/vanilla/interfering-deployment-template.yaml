@@ -1,26 +1,25 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: serving.knative.dev/v1
+kind: Service
 metadata:
-  name: interfering-deployment-${DP_NUM}
+  name: interfering-deployment-${CRITICALITY_LEVEL}-${DP_NUM}
   namespace: ${NAMESPACE}
-  labels:
-    app: interfering-deployment-${DP_NUM}
 spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: interfering-deployment-${DP_NUM}
   template:
     metadata:
-      name: interfering-pod-${DP_NUM}
-      namespace: ${NAMESPACE}
-      labels:
-        app: interfering-deployment-${DP_NUM}
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "1"
     spec:
-      terminationGracePeriodSeconds: 0
-      nodeSelector:
-        kubernetes.io/hostname: ${NODE}
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - ${NODE}
       containers:
-      - name: interfering-container
-        image: registry.k8s.io/pause:3.10
-        imagePullPolicy: Never
+        - name: knservice-container
+          image: registry.k8s.io/pause:3.10
+          imagePullPolicy: Never

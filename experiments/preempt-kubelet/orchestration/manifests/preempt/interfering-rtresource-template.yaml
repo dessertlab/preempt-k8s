@@ -1,28 +1,26 @@
-apiVersion: rtgroup.critical.com/v1
-kind: RTResource
+apiVersion: serving.knative.dev/v1
+kind: Service
 metadata:
-  name: interfering-rtresource-${RT_NUM}
+  name: interfering-rtresource-${CRITICALITY_LEVEL}-${RT_NUM}
   namespace: ${NAMESPACE}
-  labels:
-    app: interfering-rtresource-${RT_NUM}
 spec:
-  namespace: ${NAMESPACE}
-  replicas: 1
-  selector:
-    matchLabels:
-      app: interfering-rtresource-${RT_NUM}
-  criticality: ${CRITICALITY_LEVEL}
   template:
     metadata:
-      name: interfering-pod-${RT_NUM}
-      namespace: ${NAMESPACE}
-      labels:
-        app: interfering-rtresource-${RT_NUM}
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "1"
+        autoscaling.knative.dev/application-criticality-level: "${CRITICALITY_LEVEL}"
     spec:
-      terminationGracePeriodSeconds: 0
-      nodeSelector:
-        kubernetes.io/hostname: ${NODE}
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - ${NODE}
       containers:
-        - name: interfering-container
+        - name: knservice-container
           image: registry.k8s.io/pause:3.10
           imagePullPolicy: Never
