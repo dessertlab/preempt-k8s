@@ -16,6 +16,7 @@ Output files in ./kubelet-patch-analysis/<run-id>:
 
 import argparse
 import csv
+import json
 import os
 import re
 import statistics
@@ -269,6 +270,58 @@ def summary(run_id, a, rows):
     return "\n".join(out)
 
 
+def summary_json(run_id, a, rows):
+    missing = [p["name"] for p in rows if not (p.get("arrival") and p["slot_start"] and p["slot_end"])]
+    out = {
+        "run_id": run_id,
+        "mode": "bands enabled" if a.patch_mode else "bands disabled",
+        "pods": {
+            "total": len(rows),
+            "knservice": sum(1 for p in rows if p["role"] == "knservice"),
+            "interfering": sum(1 for p in rows if p["role"] == "interfering"),
+        },
+        "missing_pods": missing,
+        "parameters": {"thresholds": {"high_max_level": a.high_max, "medium_max_level": a.medium_max}},
+        "slots": None,
+        "bands": {},
+        "order": None,
+    }
+
+    for b in BANDS:
+        ps = [p for p in rows if p["band"] == b]
+
+        def stat(key, fn):
+            vals = [p[key] for p in ps if p[key] is not None]
+            return round(fn(vals), 3) if vals else None
+
+        out["bands"][b] = {
+            "pods": len(ps),
+            "avg_wait_ms": stat("wait_ms", statistics.mean),
+            "max_wait_ms": stat("wait_ms", max),
+            "avg_creation_ms": stat("slot_ms", statistics.mean),
+            "avg_total_ms": stat("total_ms", statistics.mean),
+        }
+
+    if a.patch_mode:
+        out["parameters"]["max_concurrent_pod_creations"] = a.n
+        out["parameters"]["guaranteed"] = dict(zip(BANDS, a.g))
+        out["parameters"]["stealing"] = a.stealing
+
+        peak_total, peak, violations = a.check_slots(rows)
+        out["slots"] = {
+            "expected_limits": {"total": a.n, **a.limits()},
+            "peak": {"total": peak_total, **peak},
+            "violations": violations,
+        }
+
+        order_violations, cross = a.check_order(rows)
+        out["order"] = {
+            "inversions_within_band": order_violations,
+            "dequeued_with_more_critical_waiting": cross,
+        }
+    return out
+
+
 def main():
     args = parse_args()
 
@@ -298,9 +351,11 @@ def main():
     text = summary(args.run_id, a, rows)
     with open(os.path.join(outdir, "summary.txt"), "w") as f:
         f.write(text + "\n")
+    with open(os.path.join(outdir, "summary.json"), "w") as f:
+        json.dump(summary_json(args.run_id, a, rows), f, indent=2)
     print(text)
     print("")
-    print(f"Files in {outdir}: kubelet.log, pods.csv, timeline.csv, summary.txt")
+    print(f"Files in {outdir}: kubelet.log, pods.csv, timeline.csv, summary.txt, summary.json")
 
     print("Analysis Completed!")
 

@@ -365,8 +365,8 @@ else
 fi
 RESULTS_DIR="/experiments/kubelet/$CONTROLLER_DIR/$KUBELET_DIR/${EXPERIMENT_NAME}"
 if [ "$OFFSET" -gt 0 ]; then
-    if ! kubectl exec "$QUERY_POD_NAME" -n "$NAMESPACE" -- test -f "$RESULTS_DIR/config.txt"; then
-        echo "Error: Experiment '$EXPERIMENT_NAME' not found in '$RESULTS_DIR' (missing config.txt)" >&2
+    if ! kubectl exec "$QUERY_POD_NAME" -n "$NAMESPACE" -- test -f "$RESULTS_DIR/config.json"; then
+        echo "Error: Experiment '$EXPERIMENT_NAME' not found in '$RESULTS_DIR' (missing config.json)" >&2
         exit 1
     fi
 else
@@ -382,44 +382,72 @@ echo ""
 # Save configuration to file in the pod
 if [ "$OFFSET" -eq 0 ]; then
     echo "Saving test configuration..."
-    kubectl exec "$QUERY_POD_NAME" -n "$NAMESPACE" -- sh -c "
-        cat > $RESULTS_DIR/config.txt <<EOF
-================================================
-Orchestration Benchmark - Test Configuration
-================================================
-Experiment Name: $EXPERIMENT_NAME
-Test Type: $TEST_TYPE
-Kubelet Type: $KUBELET_TYPE
-$(if [ "$KUBELET_TYPE" == "Preemptive" ]; then
-    echo "Priority Bands Feature Status: $BANDS_ENABLED"
-    echo "Priority Bands Stealing Feature Status: $STEALING_ENABLED"
-    echo "Pod Worker FIFO Scheduling Feature Status: $FIFO_ENABLED"
-    echo "Criticality Label: $CRITICALITY_LABEL_KEY"
-    echo "Criticality Maximum Level: $MAX_CRITICALITY_LEVEL"
-    echo "Criticality Minimum Level: $MIN_CRITICALITY_LEVEL"
-    if [ "$BANDS_ENABLED" == "true" ]; then
-        echo "Number of Concurrent Pod Creations allowed: $MAX_CONCURRENT_POD_CREATIONS"
-        echo "High Priority Band range: ${MAX_CRITICALITY_LEVEL}-${HIGH_BAND_MIN_LEVEL}"
-        echo "Minimum Number of Concurrent Creations granted to the High Priority Band: $HIGH_BAND_GUARANTEED"
-        echo "Medium Priority Band range: $((HIGH_BAND_MIN_LEVEL + 1))-${MEDIUM_BAND_MIN_LEVEL}"
-        echo "Minimum Number of Concurrent Creations granted to the Medium Priority Band: $MEDIUM_BAND_GUARANTEED"
-        echo "Low Priority Band range: $((MEDIUM_BAND_MIN_LEVEL + 1))-${MIN_CRITICALITY_LEVEL}"
-    fi
-fi)
-Namespace: $NAMESPACE
-Number of Services: $NUMBER_OF_SERVICES
-Iterations: $ITERATIONS
-Number of Interfering Resources: $NUMBER_OF_INTERFERING_RESOURCES
-Deploy Stress: $DEPLOY_STRESS
-Preempt-K8s Controller Namespace: $RT_CONTROLLER_NAMESPACE
-Preempt-K8s Controller Pod Name: $RT_CONTROLLER_POD
-Loki Namespace: $LOKI_NAMESPACE
-Loki Name: $LOKI_NAME
-Experiment Node: $NODE
-Kubelet Logs Verbosity Level: $KUBELET_VERBOSITY
-================================================
-EOF
-"
+    jq -n \
+        --arg experimentName "$EXPERIMENT_NAME" \
+        --arg testType "$TEST_TYPE" \
+        --arg kubeletType "$KUBELET_TYPE" \
+        --arg bandsEnabled "$BANDS_ENABLED" \
+        --arg stealingEnabled "$STEALING_ENABLED" \
+        --arg fifoEnabled "$FIFO_ENABLED" \
+        --arg criticalityLabel "$CRITICALITY_LABEL_KEY" \
+        --arg maxLevel "$MAX_CRITICALITY_LEVEL" \
+        --arg minLevel "$MIN_CRITICALITY_LEVEL" \
+        --arg maxConcurrent "$MAX_CONCURRENT_POD_CREATIONS" \
+        --arg highBandMin "$HIGH_BAND_MIN_LEVEL" \
+        --arg highBandGuaranteed "$HIGH_BAND_GUARANTEED" \
+        --arg mediumBandMin "$MEDIUM_BAND_MIN_LEVEL" \
+        --arg mediumBandGuaranteed "$MEDIUM_BAND_GUARANTEED" \
+        --arg namespace "$NAMESPACE" \
+        --arg numberOfServices "$NUMBER_OF_SERVICES" \
+        --arg iterations "$ITERATIONS" \
+        --arg interfering "$NUMBER_OF_INTERFERING_RESOURCES" \
+        --arg deployStress "$DEPLOY_STRESS" \
+        --arg rtNamespace "$RT_CONTROLLER_NAMESPACE" \
+        --arg rtPod "$RT_CONTROLLER_POD" \
+        --arg lokiNamespace "$LOKI_NAMESPACE" \
+        --arg lokiName "$LOKI_NAME" \
+        --arg node "$NODE" \
+        --arg verbosity "$KUBELET_VERBOSITY" \
+        '
+        def num: if . == "" then null else tonumber end;
+        def bool: . == "true";
+        {
+            experimentName: $experimentName,
+            testType: $testType,
+            kubeletType: $kubeletType,
+            preemptive: (if $kubeletType == "Preemptive" then {
+                priorityBandsEnabled: ($bandsEnabled | bool),
+                priorityBandsStealingEnabled: ($stealingEnabled | bool),
+                podWorkerFifoSchedulingEnabled: ($fifoEnabled | bool),
+                criticalityLabel: $criticalityLabel,
+                criticalityMaxLevel: ($maxLevel | num),
+                criticalityMinLevel: ($minLevel | num),
+                priorityBands: (if ($bandsEnabled | bool) then {
+                    maxConcurrentPodCreations: ($maxConcurrent | num),
+                    high: {
+                        range: { from: ($maxLevel | num), to: ($highBandMin | num) },
+                        guaranteedConcurrentCreations: $highBandGuaranteed
+                    },
+                    medium: {
+                        range: { from: (($highBandMin | num) + 1), to: ($mediumBandMin | num) },
+                        guaranteedConcurrentCreations: $mediumBandGuaranteed
+                    },
+                    low: {
+                        range: { from: (($mediumBandMin | num) + 1), to: ($minLevel | num) }
+                    }
+                } else null end)
+            } else null end),
+            namespace: $namespace,
+            numberOfServices: ($numberOfServices | num),
+            iterations: ($iterations | num),
+            numberOfInterferingResources: ($interfering | num),
+            deployStress: ($deployStress | bool),
+            preemptK8sController: { namespace: $rtNamespace, podName: $rtPod },
+            loki: { namespace: $lokiNamespace, name: $lokiName },
+            experimentNode: $node,
+            kubeletLogsVerbosity: ($verbosity | num)
+        }
+        ' | kubectl exec -i "$QUERY_POD_NAME" -n "$NAMESPACE" -- sh -c "cat > '$RESULTS_DIR/config.json'"
     echo ""
 fi
 
